@@ -93,4 +93,5 @@ logs/
 .cursorrules
 .cursorignore
 .cursor-settings/
-docs/
+mcp.json
+*.mcp.json
