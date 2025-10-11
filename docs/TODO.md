@@ -8,11 +8,11 @@
 
 ## Phase 0 — Project Scaffold & Local Runtime (easiest)
 
-* [ ] **Initialize repo & project layout (monorepo)**
+* [x] **Initialize repo & project layout (monorepo)**
 
   * **AC:** `job-etl/` structure exists per spec (airflow/, dbt/, services/, config/, tests/, scripts/). `README.md` shows one-command run.
 
-* [ ] **Create `.env.example` and Docker secrets placeholders**
+* [x] **Create `.env.example` and Docker secrets placeholders**
 
   * **AC:** `.env.example` includes non-sensitive vars; `secrets/` directory with README on mounting; secrets **not** tracked by git.
 
