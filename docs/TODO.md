@@ -20,7 +20,7 @@
 
   * **AC:** `docker-compose.yml` brings up Postgres with a named volume; `scripts/bootstrap_db.sql` runs automatically; schemas `raw`, `staging`, `marts` created.
 
-* [ ] **Bring up Airflow (LocalExecutor) via Docker Compose**
+* [x] **Bring up Airflow (LocalExecutor) via Docker Compose**
 
   * **AC:** Airflow web UI reachable; connection/variables bootstrap runs; example DAG shows in UI.
 
