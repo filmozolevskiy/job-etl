@@ -36,28 +36,45 @@ A learning project that builds a hands-on ETL system for ingesting, processing, 
    chmod 600 secrets/airflow/airflow_postgres_password.txt
    ```
 
-4. **Start the database:**
+4. **Initialize Airflow:**
    ```bash
-   docker-compose up -d postgres
+   # Start database services first
+   docker-compose up -d postgres airflow-postgres redis
+   
+   # Initialize Airflow (creates admin user and connections)
+   docker-compose run --rm airflow-init
    ```
 
-5. **Verify setup:**
+5. **Start all services:**
    ```bash
-   # Check if database is running
+   docker-compose up -d
+   ```
+
+6. **Access Airflow UI:**
+   - Open browser to: http://localhost:8080
+   - Username: `admin`
+   - Password: Value from `.env` file (`AIRFLOW_ADMIN_PASSWORD`, default: `admin`)
+
+7. **Verify setup:**
+   ```bash
+   # Check all services are running
    docker-compose ps
    
-   # Connect to database and verify schemas
-   docker-compose exec postgres psql -U job_etl_user -d job_etl -c "\dn"
+   # Check Airflow health
+   curl http://localhost:8080/health
+   
+   # List DAGs
+   docker-compose exec airflow-webserver airflow dags list
    ```
 
 ## Current Status
 
-✅ **Phase 0 - Step 3 Complete**: PostgreSQL database bootstrap
-- Database schemas created: `raw`, `staging`, `marts`
-- Core tables with proper indexes and constraints
-- Deduplication function (`generate_hash_key`)
-- Named volumes for data persistence
-- Docker secrets for password management
+✅ **Phase 0 - Step 4 Complete**: Airflow (LocalExecutor) running
+- PostgreSQL database with schemas: `raw`, `staging`, `marts`
+- Airflow webserver and scheduler operational
+- Example DAG for testing
+- Database connections configured
+- Docker Compose orchestration ready
 
 ## Project Structure
 
@@ -100,9 +117,15 @@ Jobs are uniquely identified by: `hash_key = md5(company|title|location)`
 
 ### Port Mappings
 - **PostgreSQL**: 5432 (main database)
-- **Airflow Webserver**: 8080
+- **Airflow Webserver**: 8080 (http://localhost:8080)
+- **Airflow Postgres**: 5432 (internal only)
 - **pgAdmin**: 8081 (optional, use `--profile tools`)
-- **Redis**: 6379
+- **Redis**: 6379 (internal only)
+
+### Default Credentials
+- **Airflow UI**: admin / admin (change `AIRFLOW_ADMIN_PASSWORD` in `.env`)
+- **PostgreSQL**: job_etl_user / (from `secrets/database/postgres_password.txt`)
+- **pgAdmin**: admin@example.com / admin (change in `.env`)
 
 ### Generating Keys
 For production use, generate secure keys for Airflow:
@@ -126,21 +149,36 @@ The next phase will involve:
 
 ## Development
 
-### Database Management
+### Airflow Management
 ```bash
-# Start database
-docker-compose up -d postgres
+# Start all services
+docker-compose up -d
 
-# Connect to database
-docker-compose exec postgres psql -U job_etl_user -d job_etl
+# Access Airflow UI
+open http://localhost:8080  # or visit in browser
 
-# Stop database
+# View logs
+docker-compose logs airflow-webserver
+docker-compose logs airflow-scheduler
+
+# Trigger example DAG
+docker-compose exec airflow-webserver airflow dags unpause example_dag
+docker-compose exec airflow-webserver airflow dags trigger example_dag
+
+# Stop all services
 docker-compose down
 ```
 
-### View Logs
+### Database Management
 ```bash
-docker-compose logs postgres
+# Connect to job_etl database
+docker-compose exec postgres psql -U job_etl_user -d job_etl
+
+# Connect to Airflow metadata database
+docker-compose exec airflow-postgres psql -U airflow -d airflow
+
+# View database schemas
+docker-compose exec postgres psql -U job_etl_user -d job_etl -c "\dn"
 ```
 
 ## Security

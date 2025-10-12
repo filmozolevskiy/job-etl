@@ -28,12 +28,11 @@ ENV AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/dags
 ENV AIRFLOW__CORE__PLUGINS_FOLDER=/opt/airflow/plugins
 ENV AIRFLOW__CORE__BASE_LOG_FOLDER=/opt/airflow/logs
 
-# Create necessary directories
-RUN mkdir -p /opt/airflow/dags /opt/airflow/plugins /opt/airflow/logs /opt/airflow/dbt /opt/airflow/config /opt/airflow/secrets /opt/airflow/artifacts
+# Create necessary directories and set permissions
+RUN mkdir -p /opt/airflow/dags /opt/airflow/plugins /opt/airflow/logs /opt/airflow/dbt /opt/airflow/config /opt/airflow/secrets /opt/airflow/artifacts \
+    && chown -R airflow:root /opt/airflow
 
-# Set proper permissions
-USER root
-RUN chown -R airflow:airflow /opt/airflow
+# Switch back to airflow user
 USER airflow
 
 # Expose port
