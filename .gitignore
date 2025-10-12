@@ -95,3 +95,7 @@ logs/
 .cursor-settings/
 mcp.json
 *.mcp.json
+
+# Documentation (excluding core project docs)
+docs/features/
+docs/commands/

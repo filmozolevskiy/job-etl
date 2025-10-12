@@ -1,1 +1,0 @@
-Use the software requirements (specification.md) and the TODO list (TODO.md) to tell me what steps I need to take to complete Step [ ] from Phase [ ] of the project in the current directory. Make sure all the acceptance criteria have been met.
