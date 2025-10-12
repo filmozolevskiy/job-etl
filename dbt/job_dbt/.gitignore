@@ -1,0 +1,21 @@
+# dbt specific
+target/
+dbt_packages/
+logs/
+profiles.yml
+
+# Compilation artifacts
+*.pyc
+__pycache__/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+

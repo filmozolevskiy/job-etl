@@ -1,0 +1,46 @@
+# This is an example profiles.yml file for local development
+# Copy this to ~/.dbt/profiles.yml and update with your actual credentials
+# For local Docker Compose setup, the defaults should work as-is
+
+job_dbt:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: job_etl_user
+      password: your_password_here  # Change this to match your POSTGRES_PASSWORD
+      dbname: job_etl
+      schema: staging  # Default schema for development
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10
+      search_path: "staging,raw,marts,public"
+      
+    prod:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: job_etl_user
+      password: "{{ env_var('POSTGRES_PASSWORD') }}"
+      dbname: job_etl
+      schema: marts
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10
+      search_path: "marts,staging,raw,public"
+      
+    docker:
+      type: postgres
+      host: postgres  # Docker Compose service name
+      port: 5432
+      user: job_etl_user
+      password: "{{ env_var('POSTGRES_PASSWORD', 'default_password') }}"
+      dbname: job_etl
+      schema: staging
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10
+      search_path: "staging,raw,marts,public"
+

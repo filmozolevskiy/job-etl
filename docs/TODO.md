@@ -24,7 +24,7 @@
 
   * **AC:** Airflow web UI reachable; connection/variables bootstrap runs; example DAG shows in UI.
 
-* [ ] **dbt project skeleton**
+* [x] **dbt project skeleton**
 
   * **AC:** `dbt/job_dbt/` compiles; `profiles.yml.example` present; `dbt test` runs zero models (pending) without error.
 

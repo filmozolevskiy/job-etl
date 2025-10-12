@@ -1,0 +1,4 @@
+# Placeholder for dbt macros
+# Macros are reusable SQL functions
+# Examples: hash_key generation, deduplication logic
+
