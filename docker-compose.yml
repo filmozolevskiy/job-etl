@@ -1,0 +1,266 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: job-etl-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-job_etl}
+      POSTGRES_USER: ${POSTGRES_USER:-job_etl_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/bootstrap_db.sql:/docker-entrypoint-initdb.d/01-bootstrap_db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-job_etl_user} -d ${POSTGRES_DB:-job_etl}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - job-etl-network
+
+  # pgAdmin (Optional - for database management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: job-etl-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "8081:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - job-etl-network
+    profiles:
+      - tools
+
+  # Redis (for Airflow metadata and caching)
+  redis:
+    image: redis:7-alpine
+    container_name: job-etl-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - job-etl-network
+
+  # Airflow Postgres Database (separate from main app database)
+  airflow-postgres:
+    image: postgres:15-alpine
+    container_name: job-etl-airflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD_FILE: /run/secrets/airflow_postgres_password
+    secrets:
+      - airflow_postgres_password
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - job-etl-network
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: job-etl-airflow-webserver
+    restart: unless-stopped
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
+      AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__CORE__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
+      AIRFLOW__WEBSERVER__WEB_SERVER_PORT: 8080
+      AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8080
+      AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      AIRFLOW__WEBSERVER__RBAC: 'true'
+      AIRFLOW__CORE__SECURITY__SESSION_COOKIE_SECURE: 'false'
+      AIRFLOW__CORE__SECURITY__COOKIE_SAMESITE: 'Lax'
+      AIRFLOW__CORE__SECURITY__COOKIE_SECURE: 'false'
+      AIRFLOW__CORE__SECURITY__COOKIE_HTTP_ONLY: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_HOSTNAME: 'true'
+      AIRFLOW__WEBSERVER__EXPOSE_STACKTRACE: 'true'
+      AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS: 'false'
+      AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/plugins:/opt/airflow/plugins:ro
+      - ./airflow/logs:/opt/airflow/logs
+      - ./dbt:/opt/airflow/dbt:ro
+      - ./config:/opt/airflow/config:ro
+      - ./secrets:/opt/airflow/secrets:ro
+      - ./artifacts:/opt/airflow/artifacts
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - job-etl-network
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: job-etl-airflow-scheduler
+    restart: unless-stopped
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
+      AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__CORE__DAG_PROCESSOR_MANAGER_LOG_LOCATION: /opt/airflow/logs/dag_processor_manager/dag_processor_manager.log
+      AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      AIRFLOW__CORE__SECURITY__SESSION_COOKIE_SECURE: 'false'
+      AIRFLOW__CORE__SECURITY__COOKIE_SAMESITE: 'Lax'
+      AIRFLOW__CORE__SECURITY__COOKIE_SECURE: 'false'
+      AIRFLOW__CORE__SECURITY__COOKIE_HTTP_ONLY: 'true'
+      AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS: 'false'
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/plugins:/opt/airflow/plugins:ro
+      - ./airflow/logs:/opt/airflow/logs
+      - ./dbt:/opt/airflow/dbt:ro
+      - ./config:/opt/airflow/config:ro
+      - ./secrets:/opt/airflow/secrets:ro
+      - ./artifacts:/opt/airflow/artifacts
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - job-etl-network
+
+  # Airflow Init (one-time setup)
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: job-etl-airflow-init
+    entrypoint: /bin/bash
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__PLUGINS_FOLDER: /opt/airflow/plugins
+      AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
+      AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    secrets:
+      - postgres_password
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/plugins:/opt/airflow/plugins:ro
+      - ./airflow/logs:/opt/airflow/logs
+      - ./dbt:/opt/airflow/dbt:ro
+      - ./config:/opt/airflow/config:ro
+      - ./secrets:/opt/airflow/secrets:ro
+      - ./artifacts:/opt/airflow/artifacts
+    command: >
+      bash -c "
+      airflow db init &&
+      airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin &&
+      airflow connections add 'postgres_default' \
+          --conn-type 'postgres' \
+          --conn-host 'postgres' \
+          --conn-login '${POSTGRES_USER:-job_etl_user}' \
+          --conn-password \"\$(cat /run/secrets/postgres_password)\" \
+          --conn-schema '${POSTGRES_DB:-job_etl}' \
+          --conn-port '5432'
+      "
+    networks:
+      - job-etl-network
+
+# Named volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  redis_data:
+    driver: local
+  airflow_postgres_data:
+    driver: local
+
+# Docker secrets for sensitive data
+secrets:
+  postgres_password:
+    file: ./secrets/database/postgres_password.txt
+  airflow_postgres_password:
+    file: ./secrets/airflow/airflow_postgres_password.txt
+
+# Network for service communication
+networks:
+  job-etl-network:
+    driver: bridge
+

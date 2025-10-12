@@ -1,0 +1,44 @@
+# Airflow core dependencies
+apache-airflow[postgres,redis]==2.8.1
+
+# Database connectors
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+
+# dbt dependencies
+dbt-core==1.7.4
+dbt-postgres==1.7.4
+
+# HTTP requests
+requests==2.31.0
+urllib3==2.1.0
+
+# Data processing
+pandas==2.1.4
+numpy==1.26.2
+
+# JSON handling
+jsonschema==4.20.0
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Testing (for development)
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Code quality
+flake8==6.1.0
+black==23.11.0
+isort==5.12.0
+
+# Security
+cryptography==41.0.8
+
+# Utilities
+click==8.1.7
+python-dateutil==2.8.2
+pytz==2023.3
