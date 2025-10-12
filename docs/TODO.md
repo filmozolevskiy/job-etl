@@ -16,7 +16,7 @@
 
   * **AC:** `.env.example` includes non-sensitive vars; `secrets/` directory with README on mounting; secrets **not** tracked by git.
 
-* [ ] **Bootstrap Postgres locally**
+* [x] **Bootstrap Postgres locally**
 
   * **AC:** `docker-compose.yml` brings up Postgres with a named volume; `scripts/bootstrap_db.sql` runs automatically; schemas `raw`, `staging`, `marts` created.
 
