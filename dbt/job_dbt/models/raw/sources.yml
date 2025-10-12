@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Raw job postings data from various providers"
+    schema: raw
+    tables:
+      - name: job_postings_raw
+        description: "Raw JSON payloads from job posting APIs"
+        columns:
+          - name: raw_id
+            description: "Primary key (UUID)"
+            tests:
+              - unique
+              - not_null
+          - name: source
+            description: "API/provider name"
+            tests:
+              - not_null
+          - name: payload
+            description: "Original JSON response from the provider"
+            tests:
+              - not_null
+          - name: collected_at
+            description: "Timestamp when the data was ingested"
+            tests:
+              - not_null
+
