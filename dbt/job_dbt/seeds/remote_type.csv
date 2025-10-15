@@ -1,0 +1,6 @@
+remote_type,description
+remote,Fully remote position
+hybrid,Hybrid (mix of remote and onsite)
+onsite,Fully onsite position
+unknown,Remote type not specified
+
