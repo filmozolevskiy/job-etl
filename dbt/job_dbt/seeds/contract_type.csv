@@ -1,0 +1,8 @@
+contract_type,description
+full_time,Full-time employment
+part_time,Part-time employment
+contract,Contract or freelance
+intern,Internship
+temp,Temporary employment
+unknown,Contract type not specified
+
