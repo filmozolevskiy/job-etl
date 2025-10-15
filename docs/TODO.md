@@ -28,7 +28,7 @@
 
   * **AC:** `dbt/job_dbt/` compiles; `profiles.yml.example` present; `dbt test` runs zero models (pending) without error.
 
-* [ ] **Write base models & seeds (enums, mappings)**
+* [x] **Write base models & seeds (enums, mappings)**
 
   * **AC:** `raw.job_postings_raw` + `staging.job_postings_stg` models compile; enum seeds load; generic tests defined but may be pending.
 
