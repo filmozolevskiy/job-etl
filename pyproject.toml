@@ -1,0 +1,124 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-etl"
+version = "0.1.0"
+description = "Incremental, Microservice-Based ETL for Job Postings"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "Job-ETL Team"}
+]
+
+[tool.ruff]
+# Target Python 3.9+ as per project requirements
+target-version = "py39"
+
+# Line length matches Black's default and is reasonable for modern screens
+line-length = 100
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+    "build",
+    "dist",
+    "airflow/logs",
+    "dbt/job_dbt/target",
+    "dbt/job_dbt/dbt_packages",
+    "artifacts",
+]
+
+[tool.ruff.lint]
+# Enable rule sets
+# E/W = pycodestyle errors and warnings
+# F = pyflakes (basic Python errors)
+# I = isort (import sorting)
+# N = pep8-naming
+# UP = pyupgrade (modern Python syntax)
+# B = flake8-bugbear (common bugs)
+# C4 = flake8-comprehensions (better list/dict comprehensions)
+# DTZ = flake8-datetimez (timezone-aware datetimes)
+# T20 = flake8-print (catch leftover print statements)
+# SIM = flake8-simplify (code simplification)
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "DTZ", "T20", "SIM"]
+
+# Ignore specific rules that might be too strict for a learning project
+ignore = [
+    "E501",    # Line too long (handled by formatter)
+    "N812",    # Lowercase imported as non-lowercase (common with pandas as pd)
+    "T201",    # print() statements (we'll use these for debugging in dev)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+# Test files can use assert statements and import fixtures
+"tests/**/*.py" = ["B011"]
+# Airflow DAGs can have longer lines due to task definitions
+"airflow/dags/*.py" = ["E501"]
+
+[tool.ruff.lint.isort]
+# Organize imports into sections
+known-first-party = ["services", "tests"]
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
+
+[tool.ruff.format]
+# Use double quotes for strings (Python community standard)
+quote-style = "double"
+# Indent with 4 spaces (PEP 8 standard)
+indent-style = "space"
+# Use Unix-style line endings
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+# Pytest configuration
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",                    # Show summary of all test outcomes
+    "--strict-markers",       # Raise error on unknown markers
+    "--strict-config",        # Raise error on invalid config
+    "--cov=services",         # Coverage for services directory
+    "--cov-report=term-missing", # Show missing lines in coverage report
+    "--cov-report=html",      # Generate HTML coverage report
+    "--cov-report=xml",       # Generate XML coverage report for CI
+]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+]
+
+[tool.coverage.run]
+# Coverage.py configuration
+source = ["services"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+# Fail if coverage is below 80% (as per project requirements)
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
