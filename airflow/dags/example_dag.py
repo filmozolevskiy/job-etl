@@ -2,6 +2,7 @@
 Example DAG for Job-ETL project.
 This is a simple DAG to verify Airflow setup is working correctly.
 """
+
 from datetime import timedelta
 
 from airflow import DAG
