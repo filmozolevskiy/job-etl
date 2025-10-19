@@ -1,0 +1,13 @@
+# Source Extractor Service Dependencies
+
+# Core dependencies for API interactions
+requests>=2.31.0  # HTTP library for API calls
+requests-retry>=0.1.0  # Additional retry utilities
+
+# Data validation and serialization
+pydantic>=2.0.0  # Data validation using Python type annotations
+
+# For future use when implementing real APIs
+# python-dotenv>=1.0.0  # Load environment variables from .env files
+# ratelimit>=2.2.1  # Rate limiting for API calls
+

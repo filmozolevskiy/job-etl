@@ -40,7 +40,7 @@
 
 ## Phase 0.5 — First End-to-End Local MVP Path
 
-* [ ] **Source adapter interface (`SourceAdapter`) defined**
+* [x] **Source adapter interface (`SourceAdapter`) defined**
 
   * **AC:** Abstract class with `fetch()` & `map_to_common()`; contract tests with mocked payloads pass.
 
