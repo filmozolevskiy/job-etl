@@ -2,16 +2,18 @@
 Example DAG for Job-ETL project.
 This is a simple DAG to verify Airflow setup is working correctly.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
+
 from airflow import DAG
-from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
+from airflow.operators.python import PythonOperator
+from airflow.utils import timezone
 
 
 default_args = {
     'owner': 'job-etl',
     'depends_on_past': False,
-    'start_date': datetime(2025, 10, 1),
+    'start_date': timezone.datetime(2025, 10, 1),
     'email_on_failure': False,
     'email_on_retry': False,
     'retries': 1,

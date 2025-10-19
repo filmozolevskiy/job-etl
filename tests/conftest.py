@@ -16,11 +16,11 @@ import pytest
 def database_url() -> str:
     """
     Provide database URL for tests.
-    
+
     Uses environment variable if set, otherwise falls back to test default.
-    
+
     Scope: session (created once per test run)
-    
+
     Returns:
         str: PostgreSQL connection URL
     """
@@ -34,12 +34,12 @@ def database_url() -> str:
 def sample_job_posting() -> dict:
     """
     Provide a sample job posting for testing.
-    
+
     This fixture returns a typical job posting structure that can be used
     in unit tests without needing to call external APIs.
-    
+
     Scope: function (created fresh for each test)
-    
+
     Returns:
         dict: Sample job posting data
     """
@@ -64,11 +64,11 @@ def sample_job_posting() -> dict:
 def sample_job_batch() -> list[dict]:
     """
     Provide a batch of sample job postings for testing.
-    
+
     Useful for testing batch processing, deduplication, and ranking logic.
-    
+
     Scope: function (created fresh for each test)
-    
+
     Returns:
         list[dict]: List of sample job postings
     """
@@ -101,7 +101,7 @@ def sample_job_batch() -> list[dict]:
 def pytest_configure(config):
     """
     Register custom pytest markers.
-    
+
     This allows us to run specific test categories:
     - pytest -m unit        (run only unit tests)
     - pytest -m integration (run only integration tests)
