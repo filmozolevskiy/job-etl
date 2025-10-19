@@ -155,11 +155,11 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
       
-      # Step 3: Install dbt
+      # Step 3: Install dbt with compatible protobuf version
       - name: Install dbt
         run: |
           echo "📦 Installing dbt..."
-          pip install dbt-core==1.7.4 dbt-postgres==1.7.4
+          pip install "protobuf>=3.20,<5" dbt-core==1.7.4 dbt-postgres==1.7.4
       
       # Step 4: Set up dbt profiles
       - name: Configure dbt profiles
