@@ -53,7 +53,7 @@ with DAG(
     # Task 1: Simple bash command
     start_task = BashOperator(
         task_id="start",
-        bash_command='echo "Starting example DAG execution..."',
+        bash_command="echo \"Starting example DAG execution...\"",
     )
 
     # Task 2: Python function
@@ -71,7 +71,7 @@ with DAG(
     # Task 4: Complete
     end_task = BashOperator(
         task_id="end",
-        bash_command='echo "Example DAG completed successfully!"',
+        bash_command="echo \"Example DAG completed successfully!\"",
     )
 
     # Define task dependencies
