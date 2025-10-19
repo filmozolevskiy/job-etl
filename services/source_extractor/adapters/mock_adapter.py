@@ -4,7 +4,7 @@ This adapter simulates an external job API for testing purposes.
 It doesn't make real HTTP requests, but follows the same patterns.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from ..base import JobPostingRaw, SourceAdapter
 
@@ -45,7 +45,7 @@ class MockAdapter(SourceAdapter):
 
     def fetch(
         self, page_token: Optional[str] = None
-    ) -> Tuple[List[JobPostingRaw], Optional[str]]:
+    ) -> tuple[list[JobPostingRaw], Optional[str]]:
         """Fetch fake job postings.
 
         Args:
@@ -85,7 +85,7 @@ class MockAdapter(SourceAdapter):
 
         return jobs, next_token
 
-    def map_to_common(self, raw: JobPostingRaw) -> Dict[str, Any]:
+    def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """Map mock job data to canonical format.
 
         Args:
@@ -115,7 +115,7 @@ class MockAdapter(SourceAdapter):
             "source": self.source_name,
         }
 
-    def _generate_fake_job(self, index: int) -> Dict[str, Any]:
+    def _generate_fake_job(self, index: int) -> dict[str, Any]:
         """Generate a fake job posting.
 
         Args:

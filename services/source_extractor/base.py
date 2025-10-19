@@ -6,7 +6,7 @@ This ensures consistency across different data sources and makes it easy to add 
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 
 @dataclass
@@ -18,7 +18,7 @@ class JobPostingRaw:
     """
 
     source: str  # Provider name (e.g., "rapidapi_jsearch")
-    payload: Dict[str, Any]  # Raw JSON response from API
+    payload: dict[str, Any]  # Raw JSON response from API
     provider_job_id: Optional[str] = None  # Provider's unique job ID (if available)
 
 
@@ -57,7 +57,7 @@ class SourceAdapter(ABC):
     @abstractmethod
     def fetch(
         self, page_token: Optional[str] = None
-    ) -> Tuple[List[JobPostingRaw], Optional[str]]:
+    ) -> tuple[list[JobPostingRaw], Optional[str]]:
         """Fetch job postings from the API.
 
         This method should handle:
@@ -89,7 +89,7 @@ class SourceAdapter(ABC):
         pass
 
     @abstractmethod
-    def map_to_common(self, raw: JobPostingRaw) -> Dict[str, Any]:
+    def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """Map provider-specific JSON to our canonical staging format.
 
         This method transforms the raw API response into a standardized format
@@ -127,7 +127,7 @@ class SourceAdapter(ABC):
         """
         pass
 
-    def validate_common_format(self, data: Dict[str, Any]) -> bool:
+    def validate_common_format(self, data: dict[str, Any]) -> bool:
         """Validate that the mapped data has required fields.
 
         This is a helper method to ensure map_to_common returns valid data.
