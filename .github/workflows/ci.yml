@@ -100,9 +100,15 @@ jobs:
           DATABASE_URL: postgresql://airflow:airflow@localhost:5432/job_etl
         run: |
           echo "🧪 Running pytest..."
-          # Run tests with coverage, but allow zero tests for now (--co for collect-only check)
-          pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing -v || \
-          echo "⚠️  No tests found yet - this is expected for initial setup"
+          # Check if services directory has Python files
+          if [ -d "services" ] && [ "$(find services -name '*.py' -not -path '*/\.*' 2>/dev/null | wc -l)" -gt 0 ]; then
+            # Services exist, run with coverage and strict requirements
+            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v
+          else
+            # No services yet, run tests without coverage requirements
+            echo "⚠️  No service code found, running tests without coverage"
+            pytest tests/ -v || echo "⚠️  No tests found yet - this is expected for initial setup"
+          fi
       
       # Step 5: Upload coverage report to GitHub
       - name: Upload coverage report
