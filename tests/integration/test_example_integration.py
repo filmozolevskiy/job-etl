@@ -43,6 +43,7 @@ def test_end_to_end_pipeline_placeholder():
     # Will be implemented in Phase 0.5
     assert True
 
+
 @pytest.mark.integration
 @pytest.mark.slow
 def test_airflow_dag_validation_placeholder():

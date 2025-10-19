@@ -26,7 +26,7 @@ def database_url() -> str:
     """
     return os.getenv(
         "DATABASE_URL",
-        "postgresql://airflow:airflow@localhost:5432/job_etl"
+        "postgresql://airflow:airflow@localhost:5432/job_etl",
     )
 
 
