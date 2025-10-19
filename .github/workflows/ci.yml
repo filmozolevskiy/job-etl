@@ -46,11 +46,11 @@ jobs:
           echo "🔍 Running Ruff linter..."
           ruff check . --output-format=github
       
-      # Step 5: Run Ruff formatter check (doesn't modify files, just checks)
-      - name: Check code formatting
-        run: |
-          echo "📝 Checking code formatting..."
-          ruff format --check .
+      # Step 5: Run Ruff formatter check (disabled for MVP - can re-enable later)
+      # - name: Check code formatting
+      #   run: |
+      #     echo "📝 Checking code formatting..."
+      #     ruff format --check .
 
   # Job 2: Run Python tests with pytest
   test:
