@@ -159,4 +159,3 @@ def test_future_api_mock_placeholder():
     """
     # For now, just pass
     assert True  # Will be implemented in Phase 0.5
-

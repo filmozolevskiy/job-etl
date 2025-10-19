@@ -1,5 +1,4 @@
-"""
-Job-ETL Test Suite
+"""Job-ETL Test Suite.
 
 This package contains unit and integration tests for the Job-ETL project.
 
@@ -9,4 +8,3 @@ Test Structure:
 """
 
 __version__ = "0.1.0"
-
