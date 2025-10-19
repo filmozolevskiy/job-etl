@@ -24,7 +24,7 @@ def test_basic_assertion():
 def test_sample_job_posting_fixture(sample_job_posting):
     """
     Test using a fixture from conftest.py.
-    
+
     Fixtures are injected as function parameters.
     The sample_job_posting fixture provides test data.
     """
@@ -46,7 +46,7 @@ def test_sample_job_posting_fixture(sample_job_posting):
 def test_title_case_transformation(input_string, expected_output):
     """
     Test title casing with multiple inputs.
-    
+
     @pytest.mark.parametrize runs this test 3 times with different values.
     This is useful for testing edge cases without writing duplicate code.
     """
@@ -58,7 +58,7 @@ def test_title_case_transformation(input_string, expected_output):
 def test_division_by_zero():
     """
     Test that we can catch expected exceptions.
-    
+
     Use pytest.raises() to verify code raises the correct exception.
     """
     with pytest.raises(ZeroDivisionError):
@@ -70,12 +70,12 @@ def test_division_by_zero():
 def test_hash_key_generation():
     """
     Test hash key generation logic.
-    
+
     In the real system, we'll use this to deduplicate jobs:
     hash_key = md5(company|title|location)
     """
     import hashlib
-    
+
     company = "Acme Corp"
     title = "Data Engineer"
     location = "Montreal, QC"
@@ -83,11 +83,11 @@ def test_hash_key_generation():
     # Normalize and combine
     hash_input = f"{company.lower()}|{title.lower()}|{location.lower()}"
     hash_key = hashlib.md5(hash_input.encode()).hexdigest()
-    
+
     # Verify it's a valid MD5 hash (32 hex characters)
     assert len(hash_key) == 32
     assert all(c in "0123456789abcdef" for c in hash_key)
-    
+
     # Verify deterministic (same input = same output)
     hash_key_2 = hashlib.md5(hash_input.encode()).hexdigest()
     assert hash_key == hash_key_2
@@ -109,7 +109,7 @@ def test_hash_key_generation():
 def test_remote_type_validation(remote_type, is_valid):
     """
     Test validation of remote_type enum values.
-    
+
     This pattern is useful for testing data quality constraints.
     """
     valid_types = {"remote", "hybrid", "onsite", "unknown"}
@@ -125,7 +125,7 @@ def test_sample_job_batch_fixture(sample_job_batch):
     assert len(sample_job_batch) == 3
     assert all("job_title" in job for job in sample_job_batch)
     assert all("company" in job for job in sample_job_batch)
-    
+
     # Test we can extract unique companies
     companies = {job["company"] for job in sample_job_batch}
     assert len(companies) == 3  # All different companies
@@ -137,7 +137,7 @@ def test_sample_job_batch_fixture(sample_job_batch):
 def test_slow_operation():
     """
     Example of a test marked as slow.
-    
+
     Run with: pytest -m "not slow" to skip these
     """
     import time
@@ -150,7 +150,7 @@ def test_slow_operation():
 def test_future_api_mock_placeholder():
     """
     Placeholder for future API mocking tests.
-    
+
     When we implement the source-extractor service, we'll add tests like:
     - Mock API responses
     - Test error handling
