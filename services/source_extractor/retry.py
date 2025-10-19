@@ -7,7 +7,7 @@ useful for handling transient network errors and rate limiting.
 import logging
 import time
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Tuple, Type, TypeVar
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -18,7 +18,7 @@ def retry_with_backoff(
     max_retries: int = 3,
     initial_delay: float = 1.0,
     backoff_factor: float = 2.0,
-    exceptions: tuple[type[Exception], ...] = (ConnectionError, TimeoutError),
+    exceptions: Tuple[Type[Exception], ...] = (ConnectionError, TimeoutError),
 ) -> Callable[[F], F]:
     """Decorator to retry a function with exponential backoff.
 
