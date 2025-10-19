@@ -88,6 +88,15 @@ logs/
 # Jupyter
 .ipynb_checkpoints/
 
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
 # Cursor IDE
 .cursor/
 .cursorrules
@@ -99,3 +108,4 @@ mcp.json
 # Documentation (excluding core project docs)
 docs/features/
 docs/commands/
+docs/architecture/
