@@ -32,7 +32,7 @@
 
   * **AC:** `raw.job_postings_raw` + `staging.job_postings_stg` models compile; enum seeds load; generic tests defined but may be pending.
 
-* [ ] **CI: lint & unit test pipeline**
+* [x] **CI: lint & unit test pipeline**
 
   * **AC:** GitHub Actions (or similar) runs `flake8/ruff + pytest + dbt compile`; fails on style/test errors.
 
