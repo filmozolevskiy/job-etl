@@ -5,9 +5,8 @@ This ensures consistency across different data sources and makes it easy to add 
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
-
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
