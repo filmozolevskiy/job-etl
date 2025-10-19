@@ -79,7 +79,7 @@ def test_hash_key_generation():
     company = "Acme Corp"
     title = "Data Engineer"
     location = "Montreal, QC"
-    
+
     # Normalize and combine
     hash_input = f"{company.lower()}|{title.lower()}|{location.lower()}"
     hash_key = hashlib.md5(hash_input.encode()).hexdigest()
@@ -113,7 +113,7 @@ def test_remote_type_validation(remote_type, is_valid):
     This pattern is useful for testing data quality constraints.
     """
     valid_types = {"remote", "hybrid", "onsite", "unknown"}
-    
+
     result = remote_type in valid_types and remote_type != ""
     assert result == is_valid
 
