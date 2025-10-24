@@ -6,7 +6,8 @@ PostgreSQL database connection. Tests should be run against a test database.
 """
 
 import os
-from datetime import datetime
+from contextlib import suppress
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import psycopg2
@@ -143,7 +144,7 @@ class TestJobStorageSaveJob:
             provider_job_id="test-job-timestamp",
         )
 
-        custom_time = datetime(2024, 1, 15, 12, 0, 0)
+        custom_time = datetime(2024, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
         raw_id = job_storage.save_job(job, collected_at=custom_time)
 
         assert raw_id is not None
@@ -296,7 +297,7 @@ class TestFullIntegrationFlow:
         assert all(isinstance(job, JobPostingRaw) for job in jobs)
 
         # Save jobs to database
-        raw_ids = job_storage.save_jobs_batch(jobs, collected_at=datetime.utcnow())
+        raw_ids = job_storage.save_jobs_batch(jobs, collected_at=datetime.now(timezone.utc))
 
         # Verify save results
         assert len(raw_ids) == 2
@@ -372,10 +373,8 @@ class TestErrorRecovery:
                 payload=None,  # Invalid - should be a dict
             )
 
-            try:
-                storage.save_job(invalid_job)
-            except (JobStorageError, Exception):
-                pass  # Expected to fail
+            with suppress(JobStorageError, Exception):
+                storage.save_job(invalid_job)  # Expected to fail
 
             # Count should be unchanged (transaction rolled back)
             final_count = storage.get_job_count_by_source("test")

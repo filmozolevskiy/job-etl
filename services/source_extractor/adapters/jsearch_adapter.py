@@ -7,7 +7,6 @@ API Documentation: services/source_extractor/adapters/jsearch_api_documentation.
 
 import logging
 import os
-from datetime import datetime
 from typing import Any, Optional
 
 import requests

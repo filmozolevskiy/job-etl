@@ -4,11 +4,10 @@ Database storage helper for saving job postings to PostgreSQL.
 This module handles persistence of raw job postings to the raw.job_postings_raw table.
 """
 
-import json
 import logging
 import os
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Optional
 
 import psycopg2
 from dotenv import load_dotenv
@@ -141,7 +140,7 @@ class JobStorage:
         if not self.connection or not self.cursor:
             raise JobStorageError("Not connected to database. Call connect() first.")
 
-        collected_at = collected_at or datetime.utcnow()
+        collected_at = collected_at or datetime.now(timezone.utc)
 
         try:
             # Insert job into raw.job_postings_raw
@@ -220,7 +219,7 @@ class JobStorage:
             logger.warning("save_jobs_batch called with empty list")
             return []
 
-        collected_at = collected_at or datetime.utcnow()
+        collected_at = collected_at or datetime.now(timezone.utc)
         raw_ids = []
 
         try:

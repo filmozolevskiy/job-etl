@@ -5,7 +5,6 @@ These tests use mocked API responses to verify adapter behavior
 without making real API calls.
 """
 
-import json
 from unittest.mock import Mock, patch
 
 import pytest
