@@ -433,7 +433,7 @@ job-etl/
 **MVP (Phase 0)**
 
 * ✅ Airflow DAG runs at 07:00 ET and on-demand.
-* ✅ At least one provider integrated; ≥100 postings ingested.
+* ✅ At least one provider integrated; ≥20 postings ingested.
 * ✅ Deduped unique rows in `marts.fact_jobs` keyed by `hash_key`.
 * ✅ Rank scores computed and persisted with `rank_explain`.
 * ✅ `.hyper` exported; Tableau dashboard shows ranked list with working filters.

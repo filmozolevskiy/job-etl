@@ -44,9 +44,10 @@
 
   * **AC:** Abstract class with `fetch()` & `map_to_common()`; contract tests with mocked payloads pass.
 
-* [ ] **Implement first provider in `source-extractor`**
+* [x] **Implement first provider in `source-extractor`**
 
-  * **AC:** Can ingest ≥100 jobs on demand; raw JSON stored to `raw.job_postings_raw` with `collected_at`, `source`.
+  * **AC:** Can ingest ≥20 jobs on demand (adjusted for API limit); raw JSON stored to `raw.job_postings_raw` with `collected_at`, `source`.
+  * **Implementation:** JSearch API (OpenWebNinja) adapter with retry logic, pagination, and comprehensive tests.
 
 * [ ] **Airflow DAG skeleton (`jobs_etl_daily`)**
 

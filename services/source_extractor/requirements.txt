@@ -7,7 +7,12 @@ requests-retry>=0.1.0  # Additional retry utilities
 # Data validation and serialization
 pydantic>=2.0.0  # Data validation using Python type annotations
 
-# For future use when implementing real APIs
-# python-dotenv>=1.0.0  # Load environment variables from .env files
+# Database
+psycopg2-binary>=2.9.0  # PostgreSQL adapter for Python
+
+# Environment and configuration
+python-dotenv>=1.0.0  # Load environment variables from .env files
+
+# For future use
 # ratelimit>=2.2.1  # Rate limiting for API calls
 

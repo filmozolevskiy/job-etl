@@ -1,5 +1,8 @@
 # Job-ETL: Incremental, Microservice-Based ETL for Job Postings
 
+[![CI Pipeline](https://github.com/filmozolevskiy/job-etl/actions/workflows/ci.yml/badge.svg)](https://github.com/filmozolevskiy/job-etl/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-check%20artifacts-blue)](https://github.com/filmozolevskiy/job-etl/actions)
+
 A learning project that builds a hands-on ETL system for ingesting, processing, and ranking job postings from 3rd-party APIs, orchestrated by Apache Airflow.
 
 ## Quick Start
@@ -75,6 +78,7 @@ A learning project that builds a hands-on ETL system for ingesting, processing, 
 - Example DAG for testing
 - Database connections configured
 - Docker Compose orchestration ready
+- **GitHub Actions CI/CD** pipeline ✨
 
 ## Project Structure
 
@@ -148,6 +152,20 @@ The next phase will involve:
 4. Building the ETL pipeline
 
 ## Development
+
+### Continuous Integration
+
+This project uses GitHub Actions for automated testing and quality checks:
+- **Linting** with Ruff (PEP 8 compliance)
+- **Testing** with pytest (unit + integration tests)
+- **dbt validation** (SQL model compilation)
+
+View CI status: https://github.com/filmozolevskiy/job-etl/actions
+
+When CI fails, detailed error reports are automatically posted to:
+- PR comments (for pull requests)
+- Commit comments (for all pushes)
+- GitHub issues (for main branch failures)
 
 ### Airflow Management
 ```bash
