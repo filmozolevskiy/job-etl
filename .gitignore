@@ -105,6 +105,14 @@ htmlcov/
 mcp.json
 *.mcp.json
 
+# Cursor/AI-specific documentation (keep local only)
+.github/CURSOR_INTEGRATION.md
+.github/AI_AGENT_GUIDE.md
+.github/QUICK_START.md
+.github/BRANCH_PROTECTION.md
+.github/scripts/verify_cursor_integration.sh
+.github/workflows/status-check.yml
+
 # Documentation (excluding core project docs)
 docs/features/
 docs/commands/

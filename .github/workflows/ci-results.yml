@@ -1,0 +1,291 @@
+# CI Results Workflow - Reports detailed CI failures
+# When CI fails, this creates issues and comments with error details for review
+name: CI Results Handler
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  handle-failure:
+    name: Process CI Results
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download workflow logs
+        uses: actions/github-script@v7
+        id: get-logs
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Get the failed workflow run
+            const runId = context.payload.workflow_run.id;
+            
+            // Get jobs for this run
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+            
+            // Find failed jobs
+            const failedJobs = jobs.jobs.filter(job => job.conclusion === 'failure');
+            
+            let errorSummary = '# CI Pipeline Failed\n\n';
+            errorSummary += `**Branch:** ${context.payload.workflow_run.head_branch}\n`;
+            errorSummary += `**Commit:** ${context.payload.workflow_run.head_sha.substring(0, 7)}\n`;
+            errorSummary += `**Triggered by:** ${context.payload.workflow_run.triggering_actor.login}\n\n`;
+            
+            errorSummary += '## Failed Jobs\n\n';
+            
+            for (const job of failedJobs) {
+              errorSummary += `### ❌ ${job.name}\n\n`;
+              
+              // Get logs for this job
+              try {
+                const logResponse = await github.rest.actions.downloadJobLogsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  job_id: job.id
+                });
+                
+                // Parse logs to find errors
+                const logs = logResponse.data;
+                const errorLines = [];
+                const lines = logs.split('\n');
+                
+                for (let i = 0; i < lines.length; i++) {
+                  const line = lines[i];
+                  if (line.includes('Error:') || line.includes('FAILED') || 
+                      line.includes('error:') || line.match(/\d+ failed/)) {
+                    // Capture context around error
+                    const start = Math.max(0, i - 3);
+                    const end = Math.min(lines.length, i + 3);
+                    errorLines.push(lines.slice(start, end).join('\n'));
+                  }
+                }
+                
+                if (errorLines.length > 0) {
+                  errorSummary += '**Error Details:**\n```\n';
+                  errorSummary += errorLines.slice(0, 5).join('\n---\n'); // Limit to 5 errors
+                  errorSummary += '\n```\n\n';
+                }
+              } catch (e) {
+                errorSummary += `Could not retrieve detailed logs: ${e.message}\n\n`;
+              }
+              
+              // Add failed steps
+              const failedSteps = job.steps.filter(step => step.conclusion === 'failure');
+              if (failedSteps.length > 0) {
+                errorSummary += '**Failed Steps:**\n';
+                for (const step of failedSteps) {
+                  errorSummary += `- ${step.name}\n`;
+                }
+                errorSummary += '\n';
+              }
+              
+              errorSummary += `[View full logs](${job.html_url})\n\n`;
+            }
+            
+            errorSummary += '---\n';
+            errorSummary += `[View workflow run](${context.payload.workflow_run.html_url})\n`;
+            
+            // Save to file for next step
+            fs.writeFileSync('error-summary.md', errorSummary);
+            
+            return errorSummary;
+      
+      - name: Comment on PR with errors
+        if: github.event.workflow_run.event == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const errorSummary = fs.readFileSync('error-summary.md', 'utf8');
+            
+            // Get PR number
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`,
+              state: 'open'
+            });
+            
+            if (pulls.length === 0) {
+              console.log('No open PR found for this branch');
+              return;
+            }
+            
+            const prNumber = pulls[0].number;
+            
+            // Check if we already commented
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('CI Pipeline Failed')
+            );
+            
+            const commentBody = `🤖 **CI Pipeline Failed - Please Review**\n\n${errorSummary}`;
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+            }
+      
+      - name: Create issue for main branch failures
+        if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const errorSummary = fs.readFileSync('error-summary.md', 'utf8');
+            
+            // Check if issue already exists for this commit
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-failure',
+              per_page: 10
+            });
+            
+            const existingIssue = issues.find(issue => 
+              issue.body.includes(context.payload.workflow_run.head_sha.substring(0, 7))
+            );
+            
+            if (existingIssue) {
+              console.log(`Issue already exists: #${existingIssue.number}`);
+              return;
+            }
+            
+            // Create new issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 CI Failed on main branch (${context.payload.workflow_run.head_sha.substring(0, 7)})`,
+              body: `🤖 **CI Pipeline Failed - Please Review**\n\n${errorSummary}`,
+              labels: ['ci-failure', 'bug', 'automated']
+            });
+      
+      - name: Create status comment on commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const errorSummary = fs.readFileSync('error-summary.md', 'utf8');
+            
+            // Add commit comment with error details
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.payload.workflow_run.head_sha,
+              body: `🤖 **CI Pipeline Failed - Errors detected**\n\n${errorSummary.substring(0, 65000)}`
+            });
+
+  success-notification:
+    name: CI Success Notification
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Comment success on PR
+        if: github.event.workflow_run.event == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Get PR number
+            const { data: pulls } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`,
+              state: 'open'
+            });
+            
+            if (pulls.length === 0) {
+              return;
+            }
+            
+            const prNumber = pulls[0].number;
+            
+            // Check for existing failure comments and close them
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('CI Pipeline Failed')
+            );
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: `~~${botComment.body}~~\n\n✅ **CI Pipeline now passing!** Issues have been resolved.`
+              });
+            }
+      
+      - name: Close CI failure issues
+        if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Close any open CI failure issues for main branch
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-failure'
+            });
+            
+            for (const issue of issues) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: '✅ CI Pipeline is now passing. Closing this issue.'
+              });
+            }
+

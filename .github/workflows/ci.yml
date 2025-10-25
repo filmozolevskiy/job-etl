@@ -44,7 +44,10 @@ jobs:
       - name: Run Ruff linter
         run: |
           echo "🔍 Running Ruff linter..."
-          ruff check . --output-format=github
+          ruff check . --output-format=github || {
+            echo "::error::Ruff linting failed. Please review and fix the errors shown above."
+            exit 1
+          }
       
       # Step 5: Run Ruff formatter check (disabled for MVP - can re-enable later)
       # - name: Check code formatting
@@ -105,12 +108,27 @@ jobs:
           # Check if services directory has Python files
           if [ -d "services" ] && [ "$(find services -name '*.py' -not -path '*/\.*' 2>/dev/null | wc -l)" -gt 0 ]; then
             # Services exist, run with coverage and strict requirements
-            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v
+            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v --tb=short || {
+              echo "::error::Pytest failed. Please review the test failures above and fix the code or tests."
+              exit 1
+            }
           else
             # No services yet, run tests without coverage requirements
             echo "⚠️  No service code found, running tests without coverage"
-            pytest tests/ -v || echo "⚠️  No tests found yet - this is expected for initial setup"
+            pytest tests/ -v --tb=short || echo "⚠️  No tests found yet - this is expected for initial setup"
           fi
+      
+      # Step 4b: Generate test failure summary
+      - name: Generate test summary
+        if: failure()
+        run: |
+          echo "## ❌ Test Failures" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tests have failed. Next steps:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Read the pytest output above" >> $GITHUB_STEP_SUMMARY
+          echo "2. Identify failing tests and error messages" >> $GITHUB_STEP_SUMMARY
+          echo "3. Fix the code to make tests pass" >> $GITHUB_STEP_SUMMARY
+          echo "4. Re-run CI to verify fixes" >> $GITHUB_STEP_SUMMARY
       
       # Step 5: Upload coverage report to GitHub
       - name: Upload coverage report
@@ -205,7 +223,10 @@ jobs:
         working-directory: dbt/job_dbt
         run: |
           echo "🔨 Compiling dbt models..."
-          dbt compile --profiles-dir ~/.dbt
+          dbt compile --profiles-dir ~/.dbt || {
+            echo "::error::dbt compilation failed. Please fix the SQL syntax or model configuration errors shown above."
+            exit 1
+          }
       
       # Step 8: Run dbt tests
       - name: Run dbt tests
