@@ -42,12 +42,24 @@ jobs:
       
       # Step 4: Run Ruff linter
       - name: Run Ruff linter
+        id: ruff
+        continue-on-error: true
         run: |
           echo "🔍 Running Ruff linter..."
-          ruff check . --output-format=github || {
-            echo "::error::Ruff linting failed. Please review and fix the errors shown above."
+          ruff check . --output-format=github 2>&1 | tee ruff-output.txt
+          LINT_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $LINT_EXIT_CODE -ne 0 ]; then
+            echo "lint-failed=true" >> $GITHUB_OUTPUT
             exit 1
-          }
+          fi
+      
+      - name: Upload lint output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-output
+          path: ruff-output.txt
+          retention-days: 7
       
       # Step 5: Run Ruff formatter check (disabled for MVP - can re-enable later)
       # - name: Check code formatting
@@ -102,6 +114,8 @@ jobs:
       
       # Step 4: Run pytest with coverage
       - name: Run pytest
+        id: pytest
+        continue-on-error: true
         env:
           # Database connection for integration tests
           DATABASE_URL: postgresql://airflow:airflow@localhost:5432/job_etl
@@ -112,15 +126,25 @@ jobs:
           # Check if services directory has Python files
           if [ -d "services" ] && [ "$(find services -name '*.py' -not -path '*/\.*' 2>/dev/null | wc -l)" -gt 0 ]; then
             # Services exist, run with coverage and strict requirements
-            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v --tb=short || {
-              echo "::error::Pytest failed. Please review the test failures above and fix the code or tests."
+            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v --tb=short 2>&1 | tee pytest-output.txt
+            TEST_EXIT_CODE=${PIPESTATUS[0]}
+            if [ $TEST_EXIT_CODE -ne 0 ]; then
+              echo "test-failed=true" >> $GITHUB_OUTPUT
               exit 1
-            }
+            fi
           else
             # No services yet, run tests without coverage requirements
             echo "⚠️  No service code found, running tests without coverage"
-            pytest tests/ -v --tb=short || echo "⚠️  No tests found yet - this is expected for initial setup"
+            pytest tests/ -v --tb=short 2>&1 | tee pytest-output.txt || echo "⚠️  No tests found yet - this is expected for initial setup"
           fi
+      
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output
+          path: pytest-output.txt
+          retention-days: 7
       
       # Step 4b: Generate test failure summary
       - name: Generate test summary
@@ -224,13 +248,25 @@ jobs:
       
       # Step 7: Compile dbt models
       - name: Compile dbt models
+        id: dbt-compile
+        continue-on-error: true
         working-directory: dbt/job_dbt
         run: |
           echo "🔨 Compiling dbt models..."
-          dbt compile --profiles-dir ~/.dbt || {
-            echo "::error::dbt compilation failed. Please fix the SQL syntax or model configuration errors shown above."
+          dbt compile --profiles-dir ~/.dbt 2>&1 | tee ../../dbt-output.txt
+          DBT_EXIT_CODE=${PIPESTATUS[0]}
+          if [ $DBT_EXIT_CODE -ne 0 ]; then
+            echo "dbt-failed=true" >> $GITHUB_OUTPUT
             exit 1
-          }
+          fi
+      
+      - name: Upload dbt output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-output
+          path: dbt-output.txt
+          retention-days: 7
       
       # Step 8: Run dbt tests
       - name: Run dbt tests
@@ -250,8 +286,15 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: read
     
     steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: artifacts/
+      
       - name: Check CI status
         id: check-status
         run: |
@@ -281,6 +324,9 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
+            const path = require('path');
+            
             const sha = context.sha.substring(0, 7);
             const branch = context.ref.replace('refs/heads/', '');
             const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -292,14 +338,44 @@ jobs:
             message += `**Workflow Run:** ${runUrl}\n\n`;
             message += '## Failed Jobs\n\n';
             
+            // Read artifacts for detailed errors
+            const artifactsDir = 'artifacts';
+            
             if ('${{ needs.lint.result }}' === 'failure') {
-              message += '❌ **Lint Python Code** - Linting errors detected\n';
+              message += '❌ **Lint Python Code**\n\n';
+              try {
+                const lintOutput = fs.readFileSync(path.join(artifactsDir, 'ruff-output', 'ruff-output.txt'), 'utf8');
+                const errorLines = lintOutput.split('\n').slice(0, 50).join('\n'); // First 50 lines
+                message += '<details>\n<summary>View linting errors</summary>\n\n```\n' + errorLines + '\n```\n</details>\n\n';
+              } catch (e) {
+                message += '*Error details not available*\n\n';
+              }
             }
+            
             if ('${{ needs.test.result }}' === 'failure') {
-              message += '❌ **Run Python Tests** - Test failures detected\n';
+              message += '❌ **Run Python Tests**\n\n';
+              try {
+                const testOutput = fs.readFileSync(path.join(artifactsDir, 'pytest-output', 'pytest-output.txt'), 'utf8');
+                // Extract failures section
+                const lines = testOutput.split('\n');
+                let failureStart = lines.findIndex(l => l.includes('FAILED') || l.includes('ERROR'));
+                if (failureStart === -1) failureStart = 0;
+                const errorLines = lines.slice(Math.max(0, failureStart - 5), failureStart + 100).join('\n');
+                message += '<details>\n<summary>View test failures</summary>\n\n```\n' + errorLines + '\n```\n</details>\n\n';
+              } catch (e) {
+                message += '*Error details not available*\n\n';
+              }
             }
+            
             if ('${{ needs.dbt-check.result }}' === 'failure') {
-              message += '❌ **Validate dbt Models** - dbt validation failed\n';
+              message += '❌ **Validate dbt Models**\n\n';
+              try {
+                const dbtOutput = fs.readFileSync(path.join(artifactsDir, 'dbt-output', 'dbt-output.txt'), 'utf8');
+                const errorLines = dbtOutput.split('\n').slice(0, 50).join('\n');
+                message += '<details>\n<summary>View dbt errors</summary>\n\n```\n' + errorLines + '\n```\n</details>\n\n';
+              } catch (e) {
+                message += '*Error details not available*\n\n';
+              }
             }
             
             message += '\n[View full logs](' + runUrl + ')\n';
