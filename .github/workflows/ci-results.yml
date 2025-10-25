@@ -131,13 +131,14 @@ jobs:
               });
             }
       
-      - name: Create issue for main branch failures
-        if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+      - name: Create issue for CI failures
+        if: github.event.workflow_run.event == 'push'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const errorSummary = fs.readFileSync('error-summary.md', 'utf8');
+            const branch = context.payload.workflow_run.head_branch;
             
             // Check if issue already exists for this commit
             const { data: issues } = await github.rest.issues.listForRepo({
@@ -161,7 +162,7 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🚨 CI Failed on main branch (${context.payload.workflow_run.head_sha.substring(0, 7)})`,
+              title: `🚨 CI Failed on ${branch} (${context.payload.workflow_run.head_sha.substring(0, 7)})`,
               body: `🤖 **CI Pipeline Failed - Please Review**\n\n${errorSummary}`,
               labels: ['ci-failure', 'bug', 'automated']
             });
@@ -228,11 +229,14 @@ jobs:
             }
       
       - name: Close CI failure issues
-        if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'
+        if: github.event.workflow_run.event == 'push'
         uses: actions/github-script@v7
         with:
           script: |
-            // Close any open CI failure issues for main branch
+            const branch = context.payload.workflow_run.head_branch;
+            const sha = context.payload.workflow_run.head_sha.substring(0, 7);
+            
+            // Close CI failure issues for this branch/commit
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -240,20 +244,23 @@ jobs:
               labels: 'ci-failure'
             });
             
+            // Only close issues that match this commit
             for (const issue of issues) {
-              await github.rest.issues.update({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                state: 'closed',
-                state_reason: 'completed'
-              });
-              
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue.number,
-                body: '✅ CI Pipeline is now passing. Closing this issue.'
-              });
+              if (issue.body && issue.body.includes(sha)) {
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed',
+                  state_reason: 'completed'
+                });
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `✅ CI Pipeline is now passing on ${branch}. Closing this issue.`
+                });
+              }
             }
 
