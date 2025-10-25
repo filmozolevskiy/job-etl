@@ -142,10 +142,10 @@ class TestJSearchAdapterFetch:
         mock_get.assert_called_once()
         call_args = mock_get.call_args
 
-        assert "job-search" in call_args[0][0]
+        assert "jsearch/search" in call_args[0][0]
         assert call_args[1]["params"]["query"] == "analytics engineer"
         assert call_args[1]["params"]["page"] == 1
-        assert call_args[1]["headers"]["Authorization"] == "Bearer test-key"
+        assert call_args[1]["headers"]["X-API-Key"] == "test-key"
 
         # Verify results
         assert len(jobs) == 2
