@@ -223,30 +223,15 @@ class JobStorage:
         raw_ids = []
 
         try:
-            # Use executemany for batch insert
+            # Insert each job and collect RETURNING values
+            # Note: We use individual inserts instead of execute_batch to support RETURNING
             insert_query = """
                 INSERT INTO raw.job_postings_raw (source, payload, collected_at)
                 VALUES (%s, %s, %s)
                 RETURNING raw_id
             """
 
-            # Prepare data for batch insert
-            batch_data = [
-                (job.source, Json(job.payload), collected_at) for job in jobs
-            ]
-
-            # Note: executemany doesn't support RETURNING in psycopg2
-            # So we'll use execute_batch from psycopg2.extras for better performance
-            from psycopg2.extras import execute_batch
-
-            # Execute batch insert
-            execute_batch(self.cursor, insert_query, batch_data)
-
-            # For RETURNING support, we need to fetch all results
-            # Since execute_batch doesn't support RETURNING well, we'll use a workaround
-            # by executing individual inserts within the same transaction
-
-            # Alternative: Use individual inserts in a transaction
+            # Execute individual inserts within the same transaction
             for job in jobs:
                 self.cursor.execute(
                     insert_query,
