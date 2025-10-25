@@ -167,7 +167,7 @@ class TestJobStorageSaveJob:
 class TestJobStorageBatchSave:
     """Test batch saving of jobs."""
 
-    def test_save_jobs_batch(self, job_storage, clean_test_data):
+    def test_save_jobs_batch(self, job_storage):
         """Test saving multiple jobs in a batch."""
         # Create multiple test jobs
         jobs = [
@@ -260,7 +260,7 @@ class TestFullIntegrationFlow:
     """Test the complete flow from adapter to database."""
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
-    def test_fetch_and_save_flow(self, mock_get, job_storage, clean_test_data):
+    def test_fetch_and_save_flow(self, mock_get, job_storage):
         """Test full flow: fetch from API (mocked) and save to database."""
         # Setup mock API response
         mock_response = Mock()
@@ -307,7 +307,7 @@ class TestFullIntegrationFlow:
         assert count == 2
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
-    def test_fetch_map_and_save_flow(self, mock_get, job_storage, clean_test_data):
+    def test_fetch_map_and_save_flow(self, mock_get, job_storage):
         """Test full flow including data mapping."""
         # Setup mock API response
         mock_response = Mock()
@@ -357,7 +357,7 @@ class TestFullIntegrationFlow:
 class TestErrorRecovery:
     """Test error handling and recovery."""
 
-    def test_save_rollback_on_error(self, database_url, clean_test_data):
+    def test_save_rollback_on_error(self, database_url):
         """Test that transactions are rolled back on error."""
         with JobStorage(database_url) as storage:
             # Save a valid job
