@@ -11,6 +11,7 @@ permissions:
   contents: read
   actions: read
   statuses: write
+  issues: write
 
 jobs:
   report-status:
@@ -83,4 +84,63 @@ jobs:
               description: conclusion === 'success' ? 'All checks passed' : 'Some checks failed',
               target_url: runUrl
             });
+            
+            // If CI failed, create an issue for AI agent to read
+            if (conclusion === 'failure') {
+              const branch = context.payload.workflow_run.head_branch;
+              
+              // Check if issue already exists for this commit
+              const { data: existingIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'ci-failure',
+                per_page: 10
+              });
+              
+              const alreadyExists = existingIssues.find(issue => 
+                issue.body && issue.body.includes(sha)
+              );
+              
+              if (!alreadyExists) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `🚨 CI Failed on ${branch} (${sha})`,
+                  body: message,
+                  labels: ['ci-failure', 'bug', 'automated']
+                });
+                
+                console.log('Created CI failure issue for AI agent');
+              }
+            }
+            
+            // If CI passed, close any open issues for this commit
+            if (conclusion === 'success') {
+              const { data: openIssues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'ci-failure'
+              });
+              
+              for (const issue of openIssues) {
+                if (issue.body && issue.body.includes(sha)) {
+                  await github.rest.issues.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    state: 'closed',
+                    state_reason: 'completed'
+                  });
+                  
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: issue.number,
+                    body: '✅ CI Pipeline is now passing. Auto-closing.'
+                  });
+                }
+              }
+            }
 
