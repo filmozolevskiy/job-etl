@@ -42,7 +42,7 @@ def database_url():
 
 
 @pytest.fixture
-def job_storage(database_url):
+def job_storage(database_url, clean_test_data):
     """Create JobStorage instance with context manager."""
     with JobStorage(database_url) as storage:
         yield storage
