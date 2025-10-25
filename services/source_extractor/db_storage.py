@@ -7,7 +7,7 @@ This module handles persistence of raw job postings to the raw.job_postings_raw 
 import logging
 import os
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
 import psycopg2
 from dotenv import load_dotenv
@@ -205,9 +205,9 @@ class JobStorage:
 
     def save_jobs_batch(
         self,
-        jobs: List[JobPostingRaw],
+        jobs: list[JobPostingRaw],
         collected_at: Optional[datetime] = None,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Save multiple job postings in a single transaction.
 
@@ -241,20 +241,20 @@ class JobStorage:
 
         try:
             # Insert each job and collect RETURNING values
-            # 
+            #
             # DESIGN DECISION: Individual INSERTs vs Batch INSERT
             # -------------------------------------------------------
             # We use individual INSERT statements instead of execute_batch() or execute_values()
             # to support the RETURNING clause, which gives us the generated UUIDs.
-            # 
+            #
             # Trade-off:
             # - Performance: ~10-20% slower than batch methods for large batches (>100 records)
             # - Benefit: Can return raw_id for each inserted row immediately
             # - All inserts happen within the same transaction (atomic)
-            # 
+            #
             # Alternative considered: execute_values() from psycopg2.extras with RETURNING
             # but it's more complex and the performance gain is minimal for our batch sizes (<100).
-            # 
+            #
             # If batch sizes grow beyond 100 records, consider refactoring to execute_values().
             insert_query = """
                 INSERT INTO raw.job_postings_raw (source, payload, collected_at)

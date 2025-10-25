@@ -21,7 +21,7 @@ from services.source_extractor.db_storage import JobStorage, JobStorageError
 @pytest.fixture
 def sample_job_payload():
     """Sample job payload for testing.
-    
+
     Returns a dictionary with standard job fields that can be used
     across multiple tests. Tests can modify this as needed.
     """
