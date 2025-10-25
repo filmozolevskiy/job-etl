@@ -357,7 +357,7 @@ class TestFullIntegrationFlow:
 class TestErrorRecovery:
     """Test error handling and recovery."""
 
-    def test_save_rollback_on_error(self, database_url):
+    def test_save_rollback_on_error(self, database_url, clean_test_data):
         """Test that transactions are rolled back on error."""
         with JobStorage(database_url) as storage:
             # Save a valid job
