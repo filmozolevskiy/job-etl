@@ -118,6 +118,8 @@ jobs:
         run: |
           echo "🗄️ Creating database tables..."
           psql -h localhost -U airflow -d job_etl -f scripts/bootstrap_db.sql
+          echo "🧹 Ensuring clean database for tests..."
+          psql -h localhost -U airflow -d job_etl -c "TRUNCATE TABLE raw.job_postings_raw CASCADE;"
       
       # Step 4: Run pytest with coverage
       - name: Run pytest
