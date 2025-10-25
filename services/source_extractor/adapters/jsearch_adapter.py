@@ -51,7 +51,7 @@ class JSearchAdapter(SourceAdapter):
         # Load configuration from environment or parameters
         self.api_key = api_key or os.getenv("JSEARCH_API_KEY")
         self.base_url = base_url or os.getenv(
-            "JSEARCH_BASE_URL", "https://api.openwebninja.com/v1"
+            "JSEARCH_BASE_URL", "https://api.openwebninja.com"
         )
         self.max_jobs = max_jobs
 
@@ -84,7 +84,7 @@ class JSearchAdapter(SourceAdapter):
         Make an API call to JSearch with retry logic.
 
         Args:
-            endpoint: API endpoint (e.g., 'job-search')
+            endpoint: API endpoint (e.g., 'jsearch/search')
             params: Query parameters
 
         Returns:
@@ -95,7 +95,7 @@ class JSearchAdapter(SourceAdapter):
         """
         url = f"{self.base_url}/{endpoint}"
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "X-API-Key": self.api_key,
             "Content-Type": "application/json",
         }
 
@@ -183,7 +183,7 @@ class JSearchAdapter(SourceAdapter):
 
         try:
             # Make API call
-            response_data = self._make_api_call("job-search", params)
+            response_data = self._make_api_call("jsearch/search", params)
 
             # Extract job data
             jobs_data = response_data.get("data", [])
