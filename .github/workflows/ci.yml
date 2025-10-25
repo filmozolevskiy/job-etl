@@ -43,7 +43,6 @@ jobs:
       # Step 4: Run Ruff linter
       - name: Run Ruff linter
         id: ruff
-        continue-on-error: true
         run: |
           echo "🔍 Running Ruff linter..."
           ruff check . --output-format=github 2>&1 | tee ruff-output.txt
@@ -115,7 +114,6 @@ jobs:
       # Step 4: Run pytest with coverage
       - name: Run pytest
         id: pytest
-        continue-on-error: true
         env:
           # Database connection for integration tests
           DATABASE_URL: postgresql://airflow:airflow@localhost:5432/job_etl
@@ -249,7 +247,6 @@ jobs:
       # Step 7: Compile dbt models
       - name: Compile dbt models
         id: dbt-compile
-        continue-on-error: true
         working-directory: dbt/job_dbt
         run: |
           echo "🔨 Compiling dbt models..."
