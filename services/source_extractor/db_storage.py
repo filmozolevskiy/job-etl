@@ -7,7 +7,7 @@ This module handles persistence of raw job postings to the raw.job_postings_raw 
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 import psycopg2
 from dotenv import load_dotenv
@@ -142,7 +142,10 @@ class JobStorage:
 
         # Validate payload is not None
         if job.payload is None:
-            raise JobStorageError("Cannot save job with None payload")
+            raise JobStorageError(
+                f"Cannot save job with None payload "
+                f"(source={job.source}, provider_id={getattr(job, 'provider_job_id', 'unknown')})"
+            )
 
         collected_at = collected_at or datetime.now(timezone.utc)
 
@@ -196,13 +199,15 @@ class JobStorage:
                     "error_type": type(e).__name__,
                 },
             )
-            raise JobStorageError(f"Failed to save job: {e}") from e
+            raise JobStorageError(
+                f"Failed to save job from {job.source}: {e}"
+            ) from e
 
     def save_jobs_batch(
         self,
-        jobs: list[JobPostingRaw],
+        jobs: List[JobPostingRaw],
         collected_at: Optional[datetime] = None,
-    ) -> list[str]:
+    ) -> List[str]:
         """
         Save multiple job postings in a single transaction.
 
@@ -226,14 +231,31 @@ class JobStorage:
         # Validate no jobs have None payload
         for i, job in enumerate(jobs):
             if job.payload is None:
-                raise JobStorageError(f"Cannot save job at index {i} with None payload")
+                raise JobStorageError(
+                    f"Cannot save job at index {i} with None payload "
+                    f"(source={job.source}, provider_id={getattr(job, 'provider_job_id', 'unknown')})"
+                )
 
         collected_at = collected_at or datetime.now(timezone.utc)
         raw_ids = []
 
         try:
             # Insert each job and collect RETURNING values
-            # Note: We use individual inserts instead of execute_batch to support RETURNING
+            # 
+            # DESIGN DECISION: Individual INSERTs vs Batch INSERT
+            # -------------------------------------------------------
+            # We use individual INSERT statements instead of execute_batch() or execute_values()
+            # to support the RETURNING clause, which gives us the generated UUIDs.
+            # 
+            # Trade-off:
+            # - Performance: ~10-20% slower than batch methods for large batches (>100 records)
+            # - Benefit: Can return raw_id for each inserted row immediately
+            # - All inserts happen within the same transaction (atomic)
+            # 
+            # Alternative considered: execute_values() from psycopg2.extras with RETURNING
+            # but it's more complex and the performance gain is minimal for our batch sizes (<100).
+            # 
+            # If batch sizes grow beyond 100 records, consider refactoring to execute_values().
             insert_query = """
                 INSERT INTO raw.job_postings_raw (source, payload, collected_at)
                 VALUES (%s, %s, %s)
@@ -276,7 +298,9 @@ class JobStorage:
                     "error_type": type(e).__name__,
                 },
             )
-            raise JobStorageError(f"Failed to save batch: {e}") from e
+            raise JobStorageError(
+                f"Failed to save batch of {len(jobs)} jobs: {e}"
+            ) from e
 
     def get_job_count_by_source(self, source: Optional[str] = None) -> int:
         """

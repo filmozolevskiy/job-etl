@@ -111,13 +111,34 @@ jobs:
           # Install service dependencies
           pip install requests pydantic python-dotenv
       
-      # Step 3b: Initialize database tables
+      # Step 3b: Initialize database tables with retry logic
       - name: Bootstrap database
         env:
           PGPASSWORD: airflow
         run: |
           echo "🗄️ Creating database tables..."
-          psql -h localhost -U airflow -d job_etl -f scripts/bootstrap_db.sql
+          
+          # Retry logic for database initialization (up to 3 attempts)
+          max_attempts=3
+          attempt=1
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts..."
+            
+            if psql -h localhost -U airflow -d job_etl -f scripts/bootstrap_db.sql; then
+              echo "✅ Database tables created successfully"
+              break
+            else
+              if [ $attempt -eq $max_attempts ]; then
+                echo "❌ Failed to create database tables after $max_attempts attempts"
+                exit 1
+              fi
+              echo "⚠️ Attempt $attempt failed, retrying in 5 seconds..."
+              sleep 5
+              attempt=$((attempt + 1))
+            fi
+          done
+          
           echo "🧹 Ensuring clean database for tests..."
           psql -h localhost -U airflow -d job_etl -c "TRUNCATE TABLE raw.job_postings_raw CASCADE;"
       
@@ -134,7 +155,7 @@ jobs:
           # Check if services directory has Python files
           if [ -d "services" ] && [ "$(find services -name '*.py' -not -path '*/\.*' 2>/dev/null | wc -l)" -gt 0 ]; then
             # Services exist, run with coverage and strict requirements
-            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=0 -v --tb=short 2>&1 | tee pytest-output.txt
+            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -v --tb=short 2>&1 | tee pytest-output.txt
             TEST_EXIT_CODE=${PIPESTATUS[0]}
             if [ $TEST_EXIT_CODE -ne 0 ]; then
               echo "test-failed=true" >> $GITHUB_OUTPUT

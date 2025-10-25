@@ -18,18 +18,24 @@ from services.source_extractor.base import JobPostingRaw
 from services.source_extractor.db_storage import JobStorage, JobStorageError
 
 
-# Sample job data for testing
-SAMPLE_JOB_PAYLOAD = {
-    "job_id": "integration-test-job-1",
-    "employer_name": "Integration Test Corp",
-    "job_title": "Integration Test Engineer",
-    "job_city": "Test City",
-    "job_state": "TC",
-    "job_country": "US",
-    "job_employment_type": "FULLTIME",
-    "job_description": "This is a test job posting for integration tests",
-    "job_is_remote": True,
-}
+@pytest.fixture
+def sample_job_payload():
+    """Sample job payload for testing.
+    
+    Returns a dictionary with standard job fields that can be used
+    across multiple tests. Tests can modify this as needed.
+    """
+    return {
+        "job_id": "integration-test-job-1",
+        "employer_name": "Integration Test Corp",
+        "job_title": "Integration Test Engineer",
+        "job_city": "Test City",
+        "job_state": "TC",
+        "job_country": "US",
+        "job_employment_type": "FULLTIME",
+        "job_description": "This is a test job posting for integration tests",
+        "job_is_remote": True,
+    }
 
 
 @pytest.fixture
@@ -116,12 +122,12 @@ class TestJobStorageConnection:
 class TestJobStorageSaveJob:
     """Test saving individual jobs to database."""
 
-    def test_save_single_job(self, job_storage, clean_test_data):
+    def test_save_single_job(self, job_storage, clean_test_data, sample_job_payload):
         """Test saving a single job posting."""
         # Create test job
         job = JobPostingRaw(
             source="test",
-            payload=SAMPLE_JOB_PAYLOAD,
+            payload=sample_job_payload,
             provider_job_id="integration-test-job-1",
         )
 
@@ -136,11 +142,11 @@ class TestJobStorageSaveJob:
         count = job_storage.get_job_count_by_source("test")
         assert count == 1
 
-    def test_save_job_with_custom_timestamp(self, job_storage, clean_test_data):
+    def test_save_job_with_custom_timestamp(self, job_storage, clean_test_data, sample_job_payload):
         """Test saving job with custom collected_at timestamp."""
         job = JobPostingRaw(
             source="test",
-            payload=SAMPLE_JOB_PAYLOAD,
+            payload=sample_job_payload,
             provider_job_id="test-job-timestamp",
         )
 
@@ -149,14 +155,14 @@ class TestJobStorageSaveJob:
 
         assert raw_id is not None
 
-    def test_save_job_without_connection_raises_error(self, database_url):
+    def test_save_job_without_connection_raises_error(self, database_url, sample_job_payload):
         """Test that saving without connection raises error."""
         storage = JobStorage(database_url)
         # Don't connect
 
         job = JobPostingRaw(
             source="test",
-            payload=SAMPLE_JOB_PAYLOAD,
+            payload=sample_job_payload,
             provider_job_id="test-job",
         )
 
@@ -167,13 +173,13 @@ class TestJobStorageSaveJob:
 class TestJobStorageBatchSave:
     """Test batch saving of jobs."""
 
-    def test_save_jobs_batch(self, job_storage):
+    def test_save_jobs_batch(self, job_storage, sample_job_payload):
         """Test saving multiple jobs in a batch."""
         # Create multiple test jobs
         jobs = [
             JobPostingRaw(
                 source="test",
-                payload={**SAMPLE_JOB_PAYLOAD, "job_id": f"batch-job-{i}"},
+                payload={**sample_job_payload, "job_id": f"batch-job-{i}"},
                 provider_job_id=f"batch-job-{i}",
             )
             for i in range(5)
@@ -196,7 +202,7 @@ class TestJobStorageBatchSave:
 
         assert raw_ids == []
 
-    def test_save_batch_without_connection_raises_error(self, database_url):
+    def test_save_batch_without_connection_raises_error(self, database_url, sample_job_payload):
         """Test that batch saving without connection raises error."""
         storage = JobStorage(database_url)
         # Don't connect
@@ -204,7 +210,7 @@ class TestJobStorageBatchSave:
         jobs = [
             JobPostingRaw(
                 source="test",
-                payload=SAMPLE_JOB_PAYLOAD,
+                payload=sample_job_payload,
                 provider_job_id="test-job",
             )
         ]
@@ -216,11 +222,11 @@ class TestJobStorageBatchSave:
 class TestJobStorageQueryMethods:
     """Test query methods for job counts."""
 
-    def test_get_job_count_all_sources(self, job_storage, clean_test_data):
+    def test_get_job_count_all_sources(self, job_storage, clean_test_data, sample_job_payload):
         """Test getting total job count across all sources."""
         # Save jobs from different sources
-        job1 = JobPostingRaw(source="test1", payload=SAMPLE_JOB_PAYLOAD)
-        job2 = JobPostingRaw(source="test2", payload=SAMPLE_JOB_PAYLOAD)
+        job1 = JobPostingRaw(source="test1", payload=sample_job_payload)
+        job2 = JobPostingRaw(source="test2", payload=sample_job_payload)
 
         job_storage.save_job(job1)
         job_storage.save_job(job2)
@@ -229,12 +235,12 @@ class TestJobStorageQueryMethods:
         total_count = job_storage.get_job_count_by_source(None)
         assert total_count >= 2  # At least our test jobs
 
-    def test_get_job_count_by_source(self, job_storage, clean_test_data):
+    def test_get_job_count_by_source(self, job_storage, clean_test_data, sample_job_payload):
         """Test getting job count filtered by source."""
         # Save jobs from different sources
-        job1 = JobPostingRaw(source="test_source_1", payload=SAMPLE_JOB_PAYLOAD)
-        job2 = JobPostingRaw(source="test_source_1", payload=SAMPLE_JOB_PAYLOAD)
-        job3 = JobPostingRaw(source="test_source_2", payload=SAMPLE_JOB_PAYLOAD)
+        job1 = JobPostingRaw(source="test_source_1", payload=sample_job_payload)
+        job2 = JobPostingRaw(source="test_source_1", payload=sample_job_payload)
+        job3 = JobPostingRaw(source="test_source_2", payload=sample_job_payload)
 
         job_storage.save_job(job1)
         job_storage.save_job(job2)
@@ -357,11 +363,11 @@ class TestFullIntegrationFlow:
 class TestErrorRecovery:
     """Test error handling and recovery."""
 
-    def test_save_rollback_on_error(self, database_url, clean_test_data):
+    def test_save_rollback_on_error(self, database_url, clean_test_data, sample_job_payload):
         """Test that transactions are rolled back on error."""
         with JobStorage(database_url) as storage:
             # Save a valid job
-            job1 = JobPostingRaw(source="test", payload=SAMPLE_JOB_PAYLOAD)
+            job1 = JobPostingRaw(source="test", payload=sample_job_payload)
             storage.save_job(job1)
 
             initial_count = storage.get_job_count_by_source("test")
@@ -380,13 +386,13 @@ class TestErrorRecovery:
             final_count = storage.get_job_count_by_source("test")
             assert final_count == initial_count
 
-    def test_multiple_saves_in_same_connection(self, job_storage, clean_test_data):
+    def test_multiple_saves_in_same_connection(self, job_storage, clean_test_data, sample_job_payload):
         """Test multiple save operations using same connection."""
         # Save multiple jobs individually
         for i in range(3):
             job = JobPostingRaw(
                 source="test",
-                payload={**SAMPLE_JOB_PAYLOAD, "job_id": f"multi-save-{i}"},
+                payload={**sample_job_payload, "job_id": f"multi-save-{i}"},
             )
             raw_id = job_storage.save_job(job)
             assert raw_id is not None
