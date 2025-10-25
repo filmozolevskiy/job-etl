@@ -140,6 +140,10 @@ class JobStorage:
         if not self.connection or not self.cursor:
             raise JobStorageError("Not connected to database. Call connect() first.")
 
+        # Validate payload is not None
+        if job.payload is None:
+            raise JobStorageError("Cannot save job with None payload")
+
         collected_at = collected_at or datetime.now(timezone.utc)
 
         try:
@@ -218,6 +222,11 @@ class JobStorage:
         if not jobs:
             logger.warning("save_jobs_batch called with empty list")
             return []
+
+        # Validate no jobs have None payload
+        for i, job in enumerate(jobs):
+            if job.payload is None:
+                raise JobStorageError(f"Cannot save job at index {i} with None payload")
 
         collected_at = collected_at or datetime.now(timezone.utc)
         raw_ids = []
