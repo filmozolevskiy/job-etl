@@ -111,6 +111,14 @@ jobs:
           # Install service dependencies
           pip install requests pydantic python-dotenv
       
+      # Step 3b: Initialize database tables
+      - name: Bootstrap database
+        env:
+          PGPASSWORD: airflow
+        run: |
+          echo "🗄️ Creating database tables..."
+          psql -h localhost -U airflow -d job_etl -f scripts/bootstrap_db.sql
+      
       # Step 4: Run pytest with coverage
       - name: Run pytest
         id: pytest
