@@ -54,39 +54,6 @@ jobs:
             for (const job of failedJobs) {
               errorSummary += `### ❌ ${job.name}\n\n`;
               
-              // Get logs for this job
-              try {
-                const logResponse = await github.rest.actions.downloadJobLogsForWorkflowRun({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  job_id: job.id
-                });
-                
-                // Parse logs to find errors
-                const logs = logResponse.data;
-                const errorLines = [];
-                const lines = logs.split('\n');
-                
-                for (let i = 0; i < lines.length; i++) {
-                  const line = lines[i];
-                  if (line.includes('Error:') || line.includes('FAILED') || 
-                      line.includes('error:') || line.match(/\d+ failed/)) {
-                    // Capture context around error
-                    const start = Math.max(0, i - 3);
-                    const end = Math.min(lines.length, i + 3);
-                    errorLines.push(lines.slice(start, end).join('\n'));
-                  }
-                }
-                
-                if (errorLines.length > 0) {
-                  errorSummary += '**Error Details:**\n```\n';
-                  errorSummary += errorLines.slice(0, 5).join('\n---\n'); // Limit to 5 errors
-                  errorSummary += '\n```\n\n';
-                }
-              } catch (e) {
-                errorSummary += `Could not retrieve detailed logs: ${e.message}\n\n`;
-              }
-              
               // Add failed steps
               const failedSteps = job.steps.filter(step => step.conclusion === 'failure');
               if (failedSteps.length > 0) {
@@ -97,6 +64,7 @@ jobs:
                 errorSummary += '\n';
               }
               
+              errorSummary += `**Duration:** ${Math.round((new Date(job.completed_at) - new Date(job.started_at)) / 1000)}s\n\n`;
               errorSummary += `[View full logs](${job.html_url})\n\n`;
             }
             
