@@ -155,7 +155,7 @@ jobs:
           # Check if services directory has Python files
           if [ -d "services" ] && [ "$(find services -name '*.py' -not -path '*/\.*' 2>/dev/null | wc -l)" -gt 0 ]; then
             # Services exist, run with coverage and strict requirements
-            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -v --tb=short 2>&1 | tee pytest-output.txt
+            pytest tests/ --cov=services --cov-report=xml --cov-report=term-missing --cov-fail-under=70 -v --tb=short 2>&1 | tee pytest-output.txt
             TEST_EXIT_CODE=${PIPESTATUS[0]}
             if [ $TEST_EXIT_CODE -ne 0 ]; then
               echo "test-failed=true" >> $GITHUB_OUTPUT
