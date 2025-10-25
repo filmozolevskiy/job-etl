@@ -89,12 +89,16 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
       
-      # Step 3: Install test dependencies
-      - name: Install test dependencies
+      # Step 3: Install dependencies
+      - name: Install dependencies
         run: |
-          echo "📦 Installing test dependencies..."
+          echo "📦 Installing dependencies..."
+          # Install test dependencies
           pip install pytest pytest-cov pytest-asyncio
+          # Install database dependencies
           pip install psycopg2-binary sqlalchemy
+          # Install service dependencies
+          pip install requests pydantic python-dotenv
       
       # Step 4: Run pytest with coverage
       - name: Run pytest
