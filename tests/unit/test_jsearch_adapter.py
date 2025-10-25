@@ -143,7 +143,7 @@ class TestJSearchAdapterFetch:
         call_args = mock_get.call_args
 
         assert "job-search" in call_args[0][0]
-        assert call_args[1]["params"]["query"] == "software engineer"
+        assert call_args[1]["params"]["query"] == "analytics engineer"
         assert call_args[1]["params"]["page"] == 1
         assert call_args[1]["headers"]["Authorization"] == "Bearer test-key"
 

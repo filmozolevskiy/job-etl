@@ -56,9 +56,9 @@ def clean_test_data(database_url):
         try:
             conn = psycopg2.connect(database_url)
             cursor = conn.cursor()
-            # Delete test jobs
+            # Delete ALL test jobs (including test1, test2, test_source_1, etc.)
             cursor.execute(
-                "DELETE FROM raw.job_postings_raw WHERE source = 'jsearch' OR source = 'test'"
+                "DELETE FROM raw.job_postings_raw WHERE source = 'jsearch' OR source LIKE 'test%'"
             )
             conn.commit()
             cursor.close()
