@@ -29,7 +29,7 @@ class JSearchAdapter(SourceAdapter):
 
     Environment Variables Required:
         JSEARCH_API_KEY: Your OpenWebNinja API key
-        JSEARCH_BASE_URL: Base URL for the API (default: https://api.openwebninja.com/v1)
+        JSEARCH_BASE_URL: Base URL for the API (default: https://api.openwebninja.com)
     """
 
     def __init__(
