@@ -348,8 +348,8 @@ class TestFullIntegrationFlow:
         assert mapped_jobs[0]["job_title"] == "Senior Engineer"
         assert mapped_jobs[0]["company"] == "Map Test Corp"
         assert mapped_jobs[0]["location"] == "Austin, TX, US"
-        assert mapped_jobs[0]["employment_type"] == "Full-time"
-        assert mapped_jobs[0]["is_remote"] is True
+        assert mapped_jobs[0]["contract_type"] == "full_time"
+        assert mapped_jobs[0]["remote_type"] == "remote"
 
         # Save original raw jobs
         raw_ids = job_storage.save_jobs_batch(jobs)

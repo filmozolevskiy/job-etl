@@ -292,12 +292,15 @@ class TestJSearchAdapterMapping:
 
         # Verify optional fields
         assert common["description"] == "We are looking for a talented software engineer..."
-        assert common["url"] == "https://example.com/apply/123"
-        assert common["posted_date"] == "2024-01-01T00:00:00.000Z"
-        assert common["employment_type"] == "Full-time"
+        assert common["job_link"] == "https://example.com/apply/123"
+        assert common["apply_url"] == "https://example.com/apply/123"
+        assert common["posted_at"] == "2024-01-01T00:00:00.000Z"
+        assert common["contract_type"] == "full_time"
         assert common["salary_min"] == 120000
         assert common["salary_max"] == 180000
-        assert common["is_remote"] is True
+        assert common["salary_currency"] == "USD"
+        assert common["remote_type"] == "remote"
+        assert common["provider_job_id"] == "test-job-1"
 
     def test_map_to_common_minimal_data(self):
         """Test mapping with minimal job data."""
@@ -322,25 +325,33 @@ class TestJSearchAdapterMapping:
         assert common["company"] == "Company"
         assert common["location"] == "Unknown"
         assert common["source"] == "jsearch"
+        assert common["remote_type"] == "unknown"
+        assert common["contract_type"] == "unknown"
 
         # Verify optional fields are None
         assert common["description"] is None
-        assert common["url"] is None
-        assert common["posted_date"] is None
+        assert common["job_link"] is None
+        assert common["apply_url"] is None
+        assert common["posted_at"] is None
+        assert common["salary_min"] is None
+        assert common["salary_max"] is None
+        assert common["skills_raw"] is None
+        assert common["company_size"] is None
 
     def test_map_to_common_employment_types(self):
-        """Test employment type mapping."""
+        """Test contract type mapping (formerly employment type)."""
         adapter = JSearchAdapter(api_key="test-key")
 
-        employment_type_tests = [
-            ("FULLTIME", "Full-time"),
-            ("PARTTIME", "Part-time"),
-            ("CONTRACTOR", "Contract"),
-            ("INTERN", "Internship"),
-            ("UNKNOWN_TYPE", "UNKNOWN_TYPE"),  # Pass through unknown types
+        contract_type_tests = [
+            ("FULLTIME", "full_time"),
+            ("PARTTIME", "part_time"),
+            ("CONTRACTOR", "contract"),
+            ("INTERN", "intern"),
+            ("TEMPORARY", "temp"),
+            ("UNKNOWN_TYPE", "unknown"),  # Unknown types map to "unknown"
         ]
 
-        for jsearch_type, expected_type in employment_type_tests:
+        for jsearch_type, expected_type in contract_type_tests:
             raw_job = JobPostingRaw(
                 source="jsearch",
                 payload={
@@ -352,7 +363,7 @@ class TestJSearchAdapterMapping:
             )
 
             common = adapter.map_to_common(raw_job)
-            assert common["employment_type"] == expected_type
+            assert common["contract_type"] == expected_type
 
     def test_map_to_common_location_formats(self):
         """Test different location format combinations."""
@@ -445,8 +456,8 @@ class TestJSearchAdapterEdgeCases:
         with pytest.raises(requests.exceptions.Timeout):
             adapter.fetch()
 
-        # Verify retries occurred (decorator retries 3 times)
-        assert mock_get.call_count == 3
+        # Verify retries occurred (1 initial + 3 retries = 4 total)
+        assert mock_get.call_count == 4
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
     def test_fetch_connection_error(self, mock_get):
@@ -459,8 +470,8 @@ class TestJSearchAdapterEdgeCases:
         with pytest.raises(ConnectionError):
             adapter.fetch()
 
-        # Verify retries occurred
-        assert mock_get.call_count == 3
+        # Verify retries occurred (1 initial + 3 retries = 4 total)
+        assert mock_get.call_count == 4
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
     def test_fetch_empty_data_array(self, mock_get):
