@@ -1,4 +1,4 @@
-"""
+﻿"""
 Job-ETL Daily DAG
 
 This DAG orchestrates the daily ETL pipeline for job postings:
@@ -52,7 +52,7 @@ default_args = {
 def extract_source_jsearch(**context):
     """
     Extract job postings from JSearch API.
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Call the source-extractor service (via DockerOperator)
     - Pass API credentials from Airflow Variables/Connections
@@ -67,7 +67,7 @@ def extract_source_jsearch(**context):
     print("  - Store raw JSON to raw.job_postings_raw")
     print("  - Return job count for XCom")
     print("=" * 60)
-    
+
     # Placeholder return value (will be replaced with actual count)
     return {"source": "jsearch", "extracted_count": 0}
 
@@ -75,7 +75,7 @@ def extract_source_jsearch(**context):
 def normalize_data(**context):
     """
     Normalize raw data to canonical staging format.
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Call the normalizer service (via DockerOperator)
     - Convert provider-specific JSON to standardized columns
@@ -90,14 +90,14 @@ def normalize_data(**context):
     print("  - Convert raw JSON to canonical format")
     print("  - Write to staging.job_postings_stg")
     print("=" * 60)
-    
+
     return {"normalized_count": 0}
 
 
 def enrich_data(**context):
     """
     Enrich job postings with skills, standardized titles, locations, etc.
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Call the enricher service (via DockerOperator)
     - Extract skills using NLP
@@ -113,14 +113,14 @@ def enrich_data(**context):
     print("  - Extract skills, standardize titles")
     print("  - Normalize locations and salaries")
     print("=" * 60)
-    
+
     return {"enriched_count": 0}
 
 
 def rank_jobs(**context):
     """
     Rank jobs based on configurable weights and profile.
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Call the ranker service (via DockerOperator)
     - Read config/ranking.yml for weights
@@ -136,14 +136,14 @@ def rank_jobs(**context):
     print("  - Calculate rank_score with explainability")
     print("  - Update marts.fact_jobs")
     print("=" * 60)
-    
+
     return {"ranked_count": 0}
 
 
 def publish_to_tableau(**context):
     """
     Publish ranked jobs to Tableau Hyper files.
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Call the publisher-hyper service (via DockerOperator)
     - Export marts.fact_jobs and marts.dim_companies
@@ -157,14 +157,14 @@ def publish_to_tableau(**context):
     print("  - Will call publisher-hyper service")
     print("  - Create .hyper files in ./artifacts/")
     print("=" * 60)
-    
+
     return {"hyper_file": "artifacts/jobs_ranked_PLACEHOLDER.hyper"}
 
 
 def send_webhook_notification(**context):
     """
     Send daily summary to configured webhook (Slack/Discord).
-    
+
     For now, this is a no-op placeholder. In the next phase, this will:
     - Collect counts from XCom (extracted, staged, ranked)
     - Read webhook URL from Airflow Variables/Connections
@@ -179,7 +179,7 @@ def send_webhook_notification(**context):
     print("  - Format summary with top matches")
     print("  - POST to configured webhook URL")
     print("=" * 60)
-    
+
     return {"notification_sent": False}
 
 
@@ -205,7 +205,7 @@ with DAG(
         task_id="start",
         doc_md="""
         **Start of jobs_etl_daily pipeline**
-        
+
         This is a dummy task that marks the beginning of the DAG.
         It has no functionality but helps visualize the flow in the UI.
         """
@@ -220,7 +220,7 @@ with DAG(
         retries=3,  # Retry API calls up to 3 times
         doc_md="""
         **Extract job postings from JSearch API**
-        
+
         - Calls source-extractor service with JSearch adapter
         - Stores raw JSON to raw.job_postings_raw
         - Returns extracted count via XCom
@@ -240,7 +240,7 @@ with DAG(
         retries=2,
         doc_md="""
         **dbt: Load raw data to staging**
-        
+
         - Runs dbt models: stg_job_postings
         - Transforms raw JSON to typed, cleaned staging tables
         - Applies enums, trims whitespace, normalizes nulls
@@ -256,7 +256,7 @@ with DAG(
         retries=3,
         doc_md="""
         **Normalize data to canonical format**
-        
+
         - Calls normalizer service
         - Converts provider-specific fields to standard schema
         - Ensures consistent enums and data types
@@ -272,7 +272,7 @@ with DAG(
         retries=3,
         doc_md="""
         **Enrich job postings**
-        
+
         - Extract skills using NLP (spaCy + keyword lists)
         - Standardize job titles via taxonomy
         - Normalize locations and salaries to CAD
@@ -293,7 +293,7 @@ with DAG(
         retries=2,
         doc_md="""
         **dbt: Build core models**
-        
+
         - Runs intermediate models (int_*)
         - Builds dimension tables (dim_companies)
         - Builds fact tables (fact_jobs)
@@ -315,7 +315,7 @@ with DAG(
         retries=2,
         doc_md="""
         **Deduplicate job postings**
-        
+
         - Uses hash_key = md5(company|title|location)
         - Upserts: update last_seen_at if exists, insert if new
         - Preserves first_seen_at for historical tracking
@@ -331,7 +331,7 @@ with DAG(
         retries=3,
         doc_md="""
         **Rank job postings**
-        
+
         - Calls ranker service
         - Reads config/ranking.yml for weights and profile
         - Calculates rank_score (0-100)
@@ -353,7 +353,7 @@ with DAG(
         retries=1,
         doc_md="""
         **dbt: Data quality tests**
-        
+
         - Tests unique constraints on hash_key
         - Tests not_null on critical fields
         - Tests accepted_values for enums
@@ -370,7 +370,7 @@ with DAG(
         retries=2,
         doc_md="""
         **Publish to Tableau**
-        
+
         - Calls publisher-hyper service
         - Exports marts.fact_jobs and marts.dim_companies
         - Creates .hyper files in ./artifacts/
@@ -388,7 +388,7 @@ with DAG(
         trigger_rule="all_done",  # Run even if upstream tasks fail
         doc_md="""
         **Send daily summary webhook**
-        
+
         - Collects counts from all tasks (extracted, staged, ranked)
         - Formats summary JSON with top matches
         - POSTs to configured Slack/Discord webhook
@@ -403,7 +403,7 @@ with DAG(
         task_id="end",
         doc_md="""
         **End of jobs_etl_daily pipeline**
-        
+
         This is a dummy task that marks the successful completion of the DAG.
         """
     )
@@ -411,8 +411,8 @@ with DAG(
     # -------------------------------------------------------------------------
     # Task Dependencies (Define the execution order)
     # -------------------------------------------------------------------------
-    
-    # Linear flow: start → extract → load → normalize → enrich → models → dedupe → rank → tests → publish → notify → end
+
+    # Linear flow: start â†’ extract â†’ load â†’ normalize â†’ enrich â†’ models â†’ dedupe â†’ rank â†’ tests â†’ publish â†’ notify â†’ end
     start >> extract_jsearch
     extract_jsearch >> load_raw_to_staging
     load_raw_to_staging >> normalize
