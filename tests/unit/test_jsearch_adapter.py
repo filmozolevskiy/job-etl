@@ -416,3 +416,180 @@ class TestJSearchAdapterValidation:
 
         assert adapter.validate_common_format(invalid_data) is False
 
+
+class TestJSearchAdapterEdgeCases:
+    """Test edge cases and error scenarios."""
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_malformed_json(self, mock_get):
+        """Test handling of malformed JSON response."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.side_effect = ValueError("Invalid JSON")
+        mock_get.return_value = mock_response
+
+        adapter = JSearchAdapter(api_key="test-key")
+
+        with pytest.raises(ValueError, match="Invalid JSON"):
+            adapter.fetch()
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_network_timeout(self, mock_get):
+        """Test handling of network timeout."""
+        mock_get.side_effect = requests.exceptions.Timeout("Request timed out")
+
+        adapter = JSearchAdapter(api_key="test-key")
+
+        # Should retry and eventually fail
+        with pytest.raises(requests.exceptions.Timeout):
+            adapter.fetch()
+
+        # Verify retries occurred (decorator retries 3 times)
+        assert mock_get.call_count == 3
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_connection_error(self, mock_get):
+        """Test handling of connection errors."""
+        mock_get.side_effect = ConnectionError("Failed to connect")
+
+        adapter = JSearchAdapter(api_key="test-key")
+
+        # Should retry and eventually fail
+        with pytest.raises(ConnectionError):
+            adapter.fetch()
+
+        # Verify retries occurred
+        assert mock_get.call_count == 3
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_empty_data_array(self, mock_get):
+        """Test handling of empty data array in response."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "OK",
+            "data": [],  # Empty array
+        }
+        mock_get.return_value = mock_response
+
+        adapter = JSearchAdapter(api_key="test-key")
+        jobs, next_page = adapter.fetch()
+
+        assert len(jobs) == 0
+        assert next_page is None
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_missing_data_key(self, mock_get):
+        """Test handling of missing 'data' key in response."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "status": "OK",
+            # Missing 'data' key
+        }
+        mock_get.return_value = mock_response
+
+        adapter = JSearchAdapter(api_key="test-key")
+        jobs, next_page = adapter.fetch()
+
+        assert len(jobs) == 0
+        assert next_page is None
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_partial_job_data(self, mock_get):
+        """Test handling of jobs with missing optional fields."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "data": [
+                {
+                    # Minimal job data - only required fields
+                    "job_id": "minimal-job",
+                    "job_title": "Test Job",
+                    "employer_name": "Test Company",
+                    # All other fields missing
+                }
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        adapter = JSearchAdapter(api_key="test-key")
+        jobs, next_page = adapter.fetch()
+
+        assert len(jobs) == 1
+        assert jobs[0].provider_job_id == "minimal-job"
+        assert jobs[0].payload["job_title"] == "Test Job"
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_api_call_count_with_retries(self, mock_get):
+        """Test that API call count includes failed retry attempts."""
+        # Fail twice, succeed on third attempt
+        mock_response_fail = Mock()
+        mock_response_fail.status_code = 500
+        mock_response_fail.text = "Internal Server Error"
+
+        mock_response_success = Mock()
+        mock_response_success.status_code = 200
+        mock_response_success.json.return_value = {"data": []}
+
+        mock_get.side_effect = [
+            requests.exceptions.HTTPError("Server Error"),
+            requests.exceptions.HTTPError("Server Error"),
+            mock_response_success,
+        ]
+
+        adapter = JSearchAdapter(api_key="test-key")
+
+        try:
+            adapter.fetch()
+        except requests.exceptions.HTTPError:
+            pass
+
+        # Should count all 3 attempts
+        assert adapter.api_call_count == 3
+
+    def test_configurable_search_parameters(self):
+        """Test that search parameters can be customized."""
+        adapter = JSearchAdapter(
+            api_key="test-key",
+            query="data scientist",
+            location="Canada",
+            date_posted="week",
+        )
+
+        assert adapter.query == "data scientist"
+        assert adapter.location == "Canada"
+        assert adapter.date_posted == "week"
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_pagination_cumulative_tracking(self, mock_get):
+        """Test that pagination correctly tracks cumulative job count."""
+        # Mock responses for multiple pages with varying sizes
+        mock_response_page1 = Mock()
+        mock_response_page1.status_code = 200
+        mock_response_page1.json.return_value = {
+            "data": [{"job_id": f"job-{i}"} for i in range(10)]  # 10 jobs
+        }
+
+        mock_response_page2 = Mock()
+        mock_response_page2.status_code = 200
+        mock_response_page2.json.return_value = {
+            "data": [{"job_id": f"job-{i}"} for i in range(10, 18)]  # 8 jobs
+        }
+
+        mock_get.return_value = mock_response_page1
+
+        adapter = JSearchAdapter(api_key="test-key", max_jobs=20)
+        jobs1, next_page1 = adapter.fetch()
+
+        assert len(jobs1) == 10
+        assert adapter.total_jobs_fetched == 10
+        assert next_page1 == "2"
+
+        mock_get.return_value = mock_response_page2
+        jobs2, next_page2 = adapter.fetch(page_token="2")
+
+        assert len(jobs2) == 8
+        assert adapter.total_jobs_fetched == 18  # Cumulative count
+        assert next_page2 == "3"  # Still has next page available
+

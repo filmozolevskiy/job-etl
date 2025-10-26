@@ -20,6 +20,13 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Constants
+API_TIMEOUT_SECONDS = 30
+DEFAULT_MAX_JOBS = 20
+DEFAULT_QUERY = "analytics engineer"
+DEFAULT_LOCATION = "United States"
+DEFAULT_DATE_POSTED = "month"
+
 
 class JSearchAdapter(SourceAdapter):
     """
@@ -36,7 +43,10 @@ class JSearchAdapter(SourceAdapter):
         self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
-        max_jobs: int = 20,
+        max_jobs: int = DEFAULT_MAX_JOBS,
+        query: str = DEFAULT_QUERY,
+        location: str = DEFAULT_LOCATION,
+        date_posted: str = DEFAULT_DATE_POSTED,
     ):
         """
         Initialize the JSearch adapter.
@@ -45,6 +55,9 @@ class JSearchAdapter(SourceAdapter):
             api_key: OpenWebNinja API key (defaults to JSEARCH_API_KEY env var)
             base_url: API base URL (defaults to JSEARCH_BASE_URL env var)
             max_jobs: Maximum number of jobs to fetch (default: 20)
+            query: Job search query (default: "analytics engineer")
+            location: Location filter (default: "United States")
+            date_posted: Date filter - all/today/3days/week/month (default: "month")
         """
         super().__init__(source_name="jsearch")
 
@@ -54,6 +67,9 @@ class JSearchAdapter(SourceAdapter):
             "JSEARCH_BASE_URL", "https://api.openwebninja.com"
         )
         self.max_jobs = max_jobs
+        self.query = query
+        self.location = location
+        self.date_posted = date_posted
 
         # Validate API key
         if not self.api_key:
@@ -61,8 +77,9 @@ class JSearchAdapter(SourceAdapter):
                 "JSEARCH_API_KEY must be set in environment or passed as parameter"
             )
 
-        # Track API usage
+        # Track API usage and pagination
         self.api_call_count = 0
+        self.total_jobs_fetched = 0  # Track cumulative jobs across pages
 
         logger.info(
             "JSearch adapter initialized",
@@ -99,19 +116,21 @@ class JSearchAdapter(SourceAdapter):
             "Content-Type": "application/json",
         }
 
+        # Track API usage (before request to count retries)
+        self.api_call_count += 1
+
         logger.debug(
             "Making JSearch API call",
             extra={
                 "endpoint": endpoint,
                 "params": params,
-                "call_count": self.api_call_count + 1,
+                "call_count": self.api_call_count,
             },
         )
 
-        response = requests.get(url, headers=headers, params=params, timeout=30)
-
-        # Track API usage
-        self.api_call_count += 1
+        response = requests.get(
+            url, headers=headers, params=params, timeout=API_TIMEOUT_SECONDS
+        )
 
         # Handle HTTP errors
         if response.status_code == 401:
@@ -126,8 +145,6 @@ class JSearchAdapter(SourceAdapter):
             raise requests.exceptions.HTTPError(
                 f"API error {response.status_code}: {response.text}"
             )
-
-        response.raise_for_status()
 
         data = response.json()
 
@@ -157,19 +174,19 @@ class JSearchAdapter(SourceAdapter):
             next_page_token is None if no more pages available
 
         Note:
-            This implementation searches for "analytics engineer" jobs in the USA
-            to get a diverse set of job postings for testing.
+            Search parameters (query, location, date_posted) are configured
+            during adapter initialization.
         """
         # Determine current page
         current_page = int(page_token) if page_token else 1
 
-        # Search parameters - using a broad query to get diverse results
+        # Build search parameters from configuration
         params = {
-            "query": "analytics engineer",
-            "location": "United States",
+            "query": self.query,
+            "location": self.location,
             "page": current_page,
             "num_pages": 1,  # Fetch one page at a time
-            "date_posted": "month",  # Recent jobs
+            "date_posted": self.date_posted,
         }
 
         logger.info(
@@ -178,6 +195,7 @@ class JSearchAdapter(SourceAdapter):
                 "page": current_page,
                 "query": params["query"],
                 "location": params["location"],
+                "date_posted": params["date_posted"],
             },
         )
 
@@ -202,12 +220,13 @@ class JSearchAdapter(SourceAdapter):
                 )
                 jobs.append(job)
 
+            # Update cumulative count
+            self.total_jobs_fetched += len(jobs)
+
             # Determine next page token
             # Continue pagination until we reach max_jobs or no more results
-            total_fetched = current_page * len(jobs_data)
             next_page = None
-
-            if total_fetched < self.max_jobs and jobs_data:
+            if self.total_jobs_fetched < self.max_jobs and jobs_data:
                 next_page = str(current_page + 1)
 
             logger.info(
@@ -215,7 +234,7 @@ class JSearchAdapter(SourceAdapter):
                 extra={
                     "page": current_page,
                     "jobs_in_page": len(jobs),
-                    "total_fetched_so_far": total_fetched,
+                    "total_fetched_so_far": self.total_jobs_fetched,
                     "has_next_page": next_page is not None,
                     "total_api_calls": self.api_call_count,
                 },
@@ -242,18 +261,23 @@ class JSearchAdapter(SourceAdapter):
             raw: JobPostingRaw object containing JSearch API response
 
         Returns:
-            Dictionary in our canonical format with fields:
-            - job_title
-            - company
-            - location
-            - source
-            - description (optional)
-            - url (optional)
-            - posted_date (optional)
-            - employment_type (optional)
-            - salary_min (optional)
-            - salary_max (optional)
-            - is_remote (optional)
+            Dictionary matching staging.job_postings_stg schema with fields:
+            - provider_job_id (str | None)
+            - job_link (str | None)
+            - job_title (str)
+            - company (str)
+            - company_size (str | None)
+            - location (str)
+            - remote_type (str: remote/hybrid/onsite/unknown)
+            - contract_type (str: full_time/part_time/contract/intern/temp/unknown)
+            - salary_min (float | None)
+            - salary_max (float | None)
+            - salary_currency (str | None)
+            - description (str | None)
+            - skills_raw (list[str] | None)
+            - posted_at (str | None)
+            - apply_url (str | None)
+            - source (str)
         """
         payload = raw.payload
 
@@ -268,35 +292,44 @@ class JSearchAdapter(SourceAdapter):
 
         location = ", ".join(location_parts) if location_parts else "Unknown"
 
-        # Map employment type
-        employment_type_map = {
-            "FULLTIME": "Full-time",
-            "PARTTIME": "Part-time",
-            "CONTRACTOR": "Contract",
-            "INTERN": "Internship",
+        # Map remote type to enum (remote, hybrid, onsite, unknown)
+        if payload.get("job_is_remote"):
+            remote_type = "remote"
+        elif location != "Unknown":
+            remote_type = "onsite"
+        else:
+            remote_type = "unknown"
+
+        # Map employment type to contract_type enum
+        contract_type_map = {
+            "FULLTIME": "full_time",
+            "PARTTIME": "part_time",
+            "CONTRACTOR": "contract",
+            "INTERN": "intern",
+            "TEMPORARY": "temp",
         }
-        employment_type = payload.get("job_employment_type")
-        if employment_type:
-            employment_type = employment_type_map.get(employment_type, employment_type)
+        contract_type = contract_type_map.get(
+            payload.get("job_employment_type"), "unknown"
+        )
 
-        # Convert timestamp to ISO date string if available
-        posted_date = None
-        if payload.get("job_posted_at_datetime_utc"):
-            posted_date = payload["job_posted_at_datetime_utc"]
-
-        # Build common format
+        # Build common format matching staging.job_postings_stg schema
         common_data = {
+            "provider_job_id": payload.get("job_id"),
+            "job_link": payload.get("job_apply_link"),
             "job_title": payload.get("job_title", "Unknown Title"),
             "company": payload.get("employer_name", "Unknown Company"),
+            "company_size": None,  # JSearch API doesn't provide this field
             "location": location,
-            "source": self.source_name,
-            "description": payload.get("job_description"),
-            "url": payload.get("job_apply_link"),
-            "posted_date": posted_date,
-            "employment_type": employment_type,
+            "remote_type": remote_type,
+            "contract_type": contract_type,
             "salary_min": payload.get("job_min_salary"),
             "salary_max": payload.get("job_max_salary"),
-            "is_remote": payload.get("job_is_remote", False),
+            "salary_currency": payload.get("job_salary_currency", "USD"),
+            "description": payload.get("job_description"),
+            "skills_raw": None,  # Will be extracted by enricher service
+            "posted_at": payload.get("job_posted_at_datetime_utc"),
+            "apply_url": payload.get("job_apply_link"),
+            "source": self.source_name,
         }
 
         # Validate the common format
