@@ -5,6 +5,7 @@ These tests use mocked API responses to verify adapter behavior
 without making real API calls.
 """
 
+from contextlib import suppress
 from unittest.mock import Mock, patch
 
 import pytest
@@ -540,10 +541,8 @@ class TestJSearchAdapterEdgeCases:
 
         adapter = JSearchAdapter(api_key="test-key")
 
-        try:
+        with suppress(requests.exceptions.HTTPError):
             adapter.fetch()
-        except requests.exceptions.HTTPError:
-            pass
 
         # Should count all 3 attempts
         assert adapter.api_call_count == 3
