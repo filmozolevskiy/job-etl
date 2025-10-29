@@ -128,6 +128,7 @@ services:
       - ./config:/opt/airflow/config:ro
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
+      - ./services:/opt/airflow/services:ro
     ports:
       - "8080:8080"
     command: webserver
@@ -178,6 +179,7 @@ services:
       - ./config:/opt/airflow/config:ro
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
+      - ./services:/opt/airflow/services:ro
     command: scheduler
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
@@ -224,6 +226,7 @@ services:
       - ./config:/opt/airflow/config:ro
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
+      - ./services:/opt/airflow/services:ro
     command:
       - bash
       - -c

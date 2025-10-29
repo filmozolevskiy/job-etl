@@ -76,22 +76,92 @@ def normalize_data(**context):
     """
     Normalize raw data to canonical staging format.
 
-    For now, this is a no-op placeholder. In the next phase, this will:
-    - Call the normalizer service (via DockerOperator)
-    - Convert provider-specific JSON to standardized columns
-    - Write to staging.job_postings_stg
-    - Return count of normalized rows
+    This function calls the normalizer service which:
+    - Reads raw JSON from raw.job_postings_raw
+    - Transforms provider-specific fields to our standard schema
+    - Generates hash_key for deduplication
+    - Upserts to staging.job_postings_stg (idempotent)
+    - Returns count of normalized rows
     """
+    import os
+    import sys
+    
+    # Add project root to path so we can import services
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+    
     print("=" * 60)
-    print("NORMALIZE TASK")
+    print("NORMALIZE TASK - Starting")
     print("=" * 60)
-    print("TODO: Implement normalization")
-    print("  - Will call normalizer service")
-    print("  - Convert raw JSON to canonical format")
-    print("  - Write to staging.job_postings_stg")
-    print("=" * 60)
-
-    return {"normalized_count": 0}
+    
+    try:
+        # Import normalizer service
+        from services.normalizer.db_operations import NormalizerDB, DatabaseError
+        from services.normalizer.main import run_normalizer
+        
+        # Get database URL from environment
+        database_url = os.getenv(
+            'DATABASE_URL',
+            'postgresql://job_etl_user:job_etl_pass@postgres:5432/job_etl'
+        )
+        
+        print(f"Connecting to database...")
+        
+        # Initialize database connection
+        db = NormalizerDB(database_url)
+        
+        # Run normalizer service
+        # Filter by source if provided via XCom from extract task
+        ti = context['ti']
+        extract_result = ti.xcom_pull(task_ids='extract_jsearch')
+        source_filter = extract_result.get('source') if extract_result else 'jsearch'
+        
+        print(f"Normalizing jobs from source: {source_filter}")
+        
+        stats = run_normalizer(
+            db=db,
+            source=source_filter,
+            limit=None,  # Process all available raw jobs
+            min_collected_at=None,  # Process all timestamps
+            dry_run=False
+        )
+        
+        print("=" * 60)
+        print("NORMALIZE TASK - Completed Successfully")
+        print("=" * 60)
+        print(f"Results:")
+        print(f"  - Fetched: {stats['fetched']}")
+        print(f"  - Normalized: {stats['normalized']}")
+        print(f"  - Upserted: {stats['upserted']}")
+        print(f"  - Failed: {stats['failed']}")
+        print(f"  - Skipped: {stats['skipped']}")
+        print("=" * 60)
+        
+        # Return stats for downstream tasks via XCom
+        return {
+            "normalized_count": stats['normalized'],
+            "upserted_count": stats['upserted'],
+            "failed_count": stats['failed'],
+            "source": source_filter
+        }
+        
+    except DatabaseError as e:
+        print("=" * 60)
+        print("NORMALIZE TASK - Database Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print("=" * 60)
+        raise
+    
+    except Exception as e:
+        print("=" * 60)
+        print("NORMALIZE TASK - Unexpected Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
 
 
 def enrich_data(**context):
