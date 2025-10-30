@@ -11,8 +11,8 @@ To run these tests:
 import pytest
 
 
-@pytest.mark.integration
-def test_database_connection_placeholder(database_url):
+@pytest.mark.skip(reason="Integration tests disabled - requires dedicated test database")
+def test_database_connection_placeholder():
     """
     Placeholder for database connection test.
 
@@ -20,13 +20,13 @@ def test_database_connection_placeholder(database_url):
     - Connection to PostgreSQL
     - Schema existence (raw, staging, marts)
     - Ability to insert/query data
+    
+    See: docs/testing-setup.md for setup instructions
     """
-    # For now, just verify the fixture provides a URL
-    assert "postgresql://" in database_url
-    assert "job_etl" in database_url
+    pass
 
 
-@pytest.mark.integration
+@pytest.mark.skip(reason="Integration tests disabled - requires dedicated test database")
 def test_end_to_end_pipeline_placeholder():
     """
     Placeholder for end-to-end pipeline test.
@@ -39,12 +39,13 @@ def test_end_to_end_pipeline_placeholder():
     5. Publish: Generate Hyper file
 
     This is the "golden path" test that verifies the whole system works.
+    
+    See: docs/testing-setup.md for setup instructions
     """
-    # Will be implemented in Phase 0.5
-    assert True
+    pass
 
 
-@pytest.mark.integration
+@pytest.mark.skip(reason="Integration tests disabled - requires dedicated test database")
 @pytest.mark.slow
 def test_airflow_dag_validation_placeholder():
     """
@@ -55,6 +56,14 @@ def test_airflow_dag_validation_placeholder():
     - Validate task dependencies
     - Check for cycles
     - Verify task configuration
+    
+    See: docs/testing-setup.md for setup instructions
     """
-    # Will be implemented in Phase 0.5
-    assert True
+    pass
+
+
+# ============================================================================
+# Mark all tests as integration tests
+# ============================================================================
+
+pytestmark = pytest.mark.integration
