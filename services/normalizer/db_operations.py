@@ -14,8 +14,9 @@ Key Features:
 """
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
+from typing import Any, Optional
 
 import psycopg2
 import psycopg2.extras
@@ -60,13 +61,12 @@ class NormalizerDB:
             self._test_connection()
             logger.info("Database connection validated successfully")
         except Exception as e:
-            raise DatabaseError(f"Failed to connect to database: {e}")
+            raise DatabaseError(f"Failed to connect to database: {e}") from e
     
     def _test_connection(self) -> None:
         """Test database connection by executing a simple query."""
-        with self._get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
+        with self._get_connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
     
     @contextmanager
     def _get_connection(self) -> Generator[psycopg2.extensions.connection, None, None]:
@@ -127,10 +127,9 @@ class NormalizerDB:
             100
         """
         try:
-            with self._get_connection() as conn:
-                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    # Build query with optional filters
-                    query = sql.SQL("""
+            with self._get_connection() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                # Build query with optional filters
+                query = sql.SQL("""
                         SELECT 
                             raw_id,
                             source,
@@ -142,41 +141,41 @@ class NormalizerDB:
                         {time_filter}
                         ORDER BY collected_at DESC
                         {limit_clause}
-                    """).format(
-                        source_filter=sql.SQL("AND source = %s") if source else sql.SQL(""),
-                        time_filter=sql.SQL("AND collected_at >= %s") if min_collected_at else sql.SQL(""),
-                        limit_clause=sql.SQL("LIMIT %s") if limit else sql.SQL("")
-                    )
-                    
-                    # Build parameters list
-                    params = []
-                    if source:
-                        params.append(source)
-                    if min_collected_at:
-                        params.append(min_collected_at)
-                    if limit:
-                        params.append(limit)
-                    
-                    cur.execute(query, params)
-                    results = cur.fetchall()
-                    
-                    logger.info(
-                        "Fetched raw job postings",
-                        extra={
-                            'count': len(results),
-                            'source_filter': source,
-                            'limit': limit,
-                        }
-                    )
-                    
-                    return [dict(row) for row in results]
-                    
+                """).format(
+                    source_filter=sql.SQL("AND source = %s") if source else sql.SQL(""),
+                    time_filter=sql.SQL("AND collected_at >= %s") if min_collected_at else sql.SQL(""),
+                    limit_clause=sql.SQL("LIMIT %s") if limit else sql.SQL("")
+                )
+
+                # Build parameters list
+                params = []
+                if source:
+                    params.append(source)
+                if min_collected_at:
+                    params.append(min_collected_at)
+                if limit:
+                    params.append(limit)
+
+                cur.execute(query, params)
+                results = cur.fetchall()
+
+                logger.info(
+                    "Fetched raw job postings",
+                    extra={
+                        'count': len(results),
+                        'source_filter': source,
+                        'limit': limit,
+                    }
+                )
+
+                return [dict(row) for row in results]
+
         except psycopg2.Error as e:
             logger.error(
                 "Failed to fetch raw jobs",
                 extra={'error': str(e), 'pgcode': e.pgcode}
             )
-            raise DatabaseError(f"Failed to fetch raw jobs: {e}")
+            raise DatabaseError(f"Failed to fetch raw jobs: {e}") from e
     
     def upsert_staging_job(self, job: dict[str, Any]) -> str:
         """
@@ -209,11 +208,10 @@ class NormalizerDB:
             'a1b2c3d4...'
         """
         try:
-            with self._get_connection() as conn:
-                with conn.cursor() as cur:
-                    # Insert or update query with ON CONFLICT
-                    # This is the key to idempotency!
-                    query = """
+            with self._get_connection() as conn, conn.cursor() as cur:
+                # Insert or update query with ON CONFLICT
+                # This is the key to idempotency!
+                query = """
                         INSERT INTO staging.job_postings_stg (
                             hash_key,
                             provider_job_id,
@@ -276,23 +274,23 @@ class NormalizerDB:
                             apply_url = COALESCE(EXCLUDED.apply_url, staging.job_postings_stg.apply_url),
                             source = EXCLUDED.source
                         RETURNING hash_key
-                    """
-                    
-                    cur.execute(query, job)
-                    result = cur.fetchone()
-                    hash_key = result[0] if result else job['hash_key']
-                    
-                    logger.debug(
-                        "Upserted job to staging",
-                        extra={
-                            'hash_key': hash_key,
-                            'company': job.get('company'),
-                            'job_title': job.get('job_title'),
-                        }
-                    )
-                    
-                    return hash_key
-                    
+                """
+
+                cur.execute(query, job)
+                result = cur.fetchone()
+                hash_key = result[0] if result else job['hash_key']
+
+                logger.debug(
+                    "Upserted job to staging",
+                    extra={
+                        'hash_key': hash_key,
+                        'company': job.get('company'),
+                        'job_title': job.get('job_title'),
+                    }
+                )
+
+                return hash_key
+
         except psycopg2.IntegrityError as e:
             logger.error(
                 "Data integrity error during upsert",
@@ -302,7 +300,7 @@ class NormalizerDB:
                     'hash_key': job.get('hash_key'),
                 }
             )
-            raise DatabaseError(f"Data integrity error: {e}")
+            raise DatabaseError(f"Data integrity error: {e}") from e
         except psycopg2.Error as e:
             logger.error(
                 "Failed to upsert staging job",
@@ -312,7 +310,7 @@ class NormalizerDB:
                     'hash_key': job.get('hash_key'),
                 }
             )
-            raise DatabaseError(f"Failed to upsert job: {e}")
+            raise DatabaseError(f"Failed to upsert job: {e}") from e
     
     def upsert_staging_jobs_batch(self, jobs: list[dict[str, Any]]) -> int:
         """
@@ -343,13 +341,12 @@ class NormalizerDB:
         failed_count = 0
         
         try:
-            with self._get_connection() as conn:
-                with conn.cursor() as cur:
-                    for job in jobs:
-                        try:
-                            # Use the same upsert query as single insert
-                            # Could be optimized further with execute_batch, but this is clearer
-                            query = """
+            with self._get_connection() as conn, conn.cursor() as cur:
+                for job in jobs:
+                    try:
+                        # Use the same upsert query as single insert
+                        # Could be optimized further with execute_batch, but this is clearer
+                        query = """
                                 INSERT INTO staging.job_postings_stg (
                                     hash_key, provider_job_id, job_link, job_title, company,
                                     company_size, location, remote_type, contract_type,
@@ -382,40 +379,40 @@ class NormalizerDB:
                                     posted_at = COALESCE(EXCLUDED.posted_at, staging.job_postings_stg.posted_at),
                                     apply_url = COALESCE(EXCLUDED.apply_url, staging.job_postings_stg.apply_url),
                                     source = EXCLUDED.source
-                            """
-                            
-                            cur.execute(query, job)
-                            success_count += 1
-                            
-                        except psycopg2.Error as e:
-                            failed_count += 1
-                            logger.warning(
-                                "Failed to upsert individual job in batch",
-                                extra={
-                                    'error': str(e),
-                                    'hash_key': job.get('hash_key'),
-                                    'company': job.get('company'),
-                                }
-                            )
-                            # Continue processing other jobs
-                    
-                    logger.info(
-                        "Batch upsert completed",
-                        extra={
-                            'total': len(jobs),
-                            'success': success_count,
-                            'failed': failed_count,
-                        }
-                    )
-                    
-                    return success_count
-                    
+                        """
+
+                        cur.execute(query, job)
+                        success_count += 1
+
+                    except psycopg2.Error as e:
+                        failed_count += 1
+                        logger.warning(
+                            "Failed to upsert individual job in batch",
+                            extra={
+                                'error': str(e),
+                                'hash_key': job.get('hash_key'),
+                                'company': job.get('company'),
+                            }
+                        )
+                        # Continue processing other jobs
+
+                logger.info(
+                    "Batch upsert completed",
+                    extra={
+                        'total': len(jobs),
+                        'success': success_count,
+                        'failed': failed_count,
+                    }
+                )
+
+                return success_count
+
         except psycopg2.Error as e:
             logger.error(
                 "Batch upsert transaction failed",
                 extra={'error': str(e), 'pgcode': e.pgcode}
             )
-            raise DatabaseError(f"Batch upsert failed: {e}")
+            raise DatabaseError(f"Batch upsert failed: {e}") from e
     
     def get_staging_stats(self) -> dict[str, Any]:
         """
@@ -434,40 +431,39 @@ class NormalizerDB:
             >>> print(f"Total jobs: {stats['total_jobs']}")
         """
         try:
-            with self._get_connection() as conn:
-                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                    cur.execute("""
-                        SELECT 
-                            COUNT(*) as total_jobs,
-                            COUNT(DISTINCT source) as source_count,
-                            MAX(last_seen_at) as latest_update,
-                            MIN(first_seen_at) as earliest_job
-                        FROM staging.job_postings_stg
-                    """)
-                    overall = dict(cur.fetchone())
-                    
-                    cur.execute("""
-                        SELECT 
-                            source,
-                            COUNT(*) as job_count
-                        FROM staging.job_postings_stg
-                        GROUP BY source
-                        ORDER BY job_count DESC
-                    """)
-                    by_source = [dict(row) for row in cur.fetchall()]
-                    
-                    return {
-                        'total_jobs': overall['total_jobs'],
-                        'source_count': overall['source_count'],
-                        'latest_update': overall['latest_update'],
-                        'earliest_job': overall['earliest_job'],
-                        'jobs_by_source': by_source,
-                    }
-                    
+            with self._get_connection() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT
+                        COUNT(*) as total_jobs,
+                        COUNT(DISTINCT source) as source_count,
+                        MAX(last_seen_at) as latest_update,
+                        MIN(first_seen_at) as earliest_job
+                    FROM staging.job_postings_stg
+                """)
+                overall = dict(cur.fetchone())
+
+                cur.execute("""
+                    SELECT
+                        source,
+                        COUNT(*) as job_count
+                    FROM staging.job_postings_stg
+                    GROUP BY source
+                    ORDER BY job_count DESC
+                """)
+                by_source = [dict(row) for row in cur.fetchall()]
+
+                return {
+                    'total_jobs': overall['total_jobs'],
+                    'source_count': overall['source_count'],
+                    'latest_update': overall['latest_update'],
+                    'earliest_job': overall['earliest_job'],
+                    'jobs_by_source': by_source,
+                }
+
         except psycopg2.Error as e:
             logger.error(
                 "Failed to get staging stats",
                 extra={'error': str(e)}
             )
-            raise DatabaseError(f"Failed to get stats: {e}")
+            raise DatabaseError(f"Failed to get stats: {e}") from e
 

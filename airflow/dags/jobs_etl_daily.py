@@ -86,21 +86,21 @@ def normalize_data(**context):
     import os
     import sys
     from airflow.hooks.base import BaseHook
-    
+
     # Add project root to path so we can import services
     project_root = '/opt/airflow'
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    
+
     print("=" * 60)
     print("NORMALIZE TASK - Starting")
     print("=" * 60)
-    
+
     try:
         # Import normalizer service
         from services.normalizer.db_operations import NormalizerDB, DatabaseError
         from services.normalizer.main import run_normalizer
-        
+
         # Get database URL from Airflow connection
         try:
             conn = BaseHook.get_connection('postgres_default')
@@ -112,20 +112,20 @@ def normalize_data(**context):
                 'DATABASE_URL',
                 'postgresql://job_etl_user:job_etl_pass@postgres:5432/job_etl'
             )
-        
-        print(f"Connecting to database...")
-        
+
+        print("Connecting to database...")
+
         # Initialize database connection
         db = NormalizerDB(database_url)
-        
+
         # Run normalizer service
         # Filter by source if provided via XCom from extract task
         ti = context['ti']
         extract_result = ti.xcom_pull(task_ids='extract_jsearch')
         source_filter = extract_result.get('source') if extract_result else 'jsearch'
-        
+
         print(f"Normalizing jobs from source: {source_filter}")
-        
+
         stats = run_normalizer(
             db=db,
             source=source_filter,
@@ -133,18 +133,18 @@ def normalize_data(**context):
             min_collected_at=None,  # Process all timestamps
             dry_run=False
         )
-        
+
         print("=" * 60)
         print("NORMALIZE TASK - Completed Successfully")
         print("=" * 60)
-        print(f"Results:")
+        print("Results:")
         print(f"  - Fetched: {stats['fetched']}")
         print(f"  - Normalized: {stats['normalized']}")
         print(f"  - Upserted: {stats['upserted']}")
         print(f"  - Failed: {stats['failed']}")
         print(f"  - Skipped: {stats['skipped']}")
         print("=" * 60)
-        
+
         # Return stats for downstream tasks via XCom
         return {
             "normalized_count": stats['normalized'],
@@ -152,7 +152,7 @@ def normalize_data(**context):
             "failed_count": stats['failed'],
             "source": source_filter
         }
-        
+
     except DatabaseError as e:
         print("=" * 60)
         print("NORMALIZE TASK - Database Error")
@@ -160,7 +160,7 @@ def normalize_data(**context):
         print(f"Error: {e}")
         print("=" * 60)
         raise
-    
+
     except Exception as e:
         print("=" * 60)
         print("NORMALIZE TASK - Unexpected Error")
