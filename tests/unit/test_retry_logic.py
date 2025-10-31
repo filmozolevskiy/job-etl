@@ -185,3 +185,8 @@ class TestRetryIntegrationWithAdapter:
         assert len(jobs) > 0
         # Note: attempt_count will be 2+ because of retries
 
+# ============================================================================
+# Mark all tests as unit tests
+# ============================================================================
+
+pytestmark = pytest.mark.unit

@@ -12,7 +12,6 @@ import pytest
 
 
 # Basic test example
-@pytest.mark.unit
 def test_basic_assertion():
     """Test basic assertions work correctly."""
     assert 1 + 1 == 2
@@ -20,7 +19,6 @@ def test_basic_assertion():
 
 
 # Test with fixture
-@pytest.mark.unit
 def test_sample_job_posting_fixture(sample_job_posting):
     """
     Test using a fixture from conftest.py.
@@ -34,7 +32,6 @@ def test_sample_job_posting_fixture(sample_job_posting):
 
 
 # Test with parametrize (run same test with different inputs)
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "input_string,expected_output",
     [
@@ -54,7 +51,6 @@ def test_title_case_transformation(input_string, expected_output):
 
 
 # Test exception handling
-@pytest.mark.unit
 def test_division_by_zero():
     """
     Test that we can catch expected exceptions.
@@ -66,7 +62,6 @@ def test_division_by_zero():
 
 
 # Example of testing a simple data transformation function
-@pytest.mark.unit
 def test_hash_key_generation():
     """
     Test hash key generation logic.
@@ -94,7 +89,6 @@ def test_hash_key_generation():
 
 
 # Example of testing data validation
-@pytest.mark.unit
 @pytest.mark.parametrize(
     "remote_type,is_valid",
     [
@@ -119,7 +113,6 @@ def test_remote_type_validation(remote_type, is_valid):
 
 
 # Test using batch fixture
-@pytest.mark.unit
 def test_sample_job_batch_fixture(sample_job_batch):
     """Test batch processing with multiple job postings."""
     assert len(sample_job_batch) == 3
@@ -132,7 +125,6 @@ def test_sample_job_batch_fixture(sample_job_batch):
 
 
 # Example of a slow test (marked for optional skipping)
-@pytest.mark.unit
 @pytest.mark.slow
 def test_slow_operation():
     """
@@ -146,7 +138,6 @@ def test_slow_operation():
 
 
 # Test that demonstrates mocking (when we have services to mock)
-@pytest.mark.unit
 def test_future_api_mock_placeholder():
     """
     Placeholder for future API mocking tests.
@@ -159,3 +150,9 @@ def test_future_api_mock_placeholder():
     """
     # For now, just pass
     assert True  # Will be implemented in Phase 0.5
+
+# ============================================================================
+# Mark all tests as unit tests
+# ============================================================================
+
+pytestmark = pytest.mark.unit

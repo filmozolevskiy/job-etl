@@ -49,7 +49,7 @@
   * **AC:** Can ingest ≥20 jobs on demand (adjusted for API limit); raw JSON stored to `raw.job_postings_raw` with `collected_at`, `source`.
   * **Implementation:** JSearch API (OpenWebNinja) adapter with retry logic, pagination, and comprehensive tests.
 
-* [ ] **Airflow DAG skeleton (`jobs_etl_daily`)**
+* [x] **Airflow DAG skeleton (`jobs_etl_daily`)**
 
   * **AC:** DAG contains tasks: `start → extract_{source} → load_raw_to_staging → normalize → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
 
