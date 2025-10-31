@@ -173,18 +173,44 @@ def run_normalizer(
         logger.error(f"Failed to fetch raw jobs: {e}")
         raise
     
+    # Import adapters for mapping raw payloads to common format
+    from services.source_extractor.adapters.jsearch_adapter import JSearchAdapter
+    from services.source_extractor.base import JobPostingRaw
+    
+    # Initialize adapters (could be moved to a registry pattern for multiple sources)
+    adapters = {
+        'jsearch': JSearchAdapter()
+    }
+    
     # Process each raw job
     normalized_jobs = []
     
     for raw_job in raw_jobs:
         try:
-            # The payload is already parsed JSONB from database
-            # It should match the output of SourceAdapter.map_to_common()
-            payload = raw_job['payload']
+            # The payload contains the RAW API response
+            raw_payload = raw_job['payload']
             source_name = raw_job['source']
             
-            # Normalize the job posting
-            normalized = normalize_job_posting(payload, source_name)
+            # Map raw API response to common format
+            adapter = adapters.get(source_name)
+            if not adapter:
+                stats['skipped'] += 1
+                logger.warning(
+                    f"No adapter found for source: {source_name}",
+                    extra={'raw_id': raw_job.get('raw_id')}
+                )
+                continue
+            
+            # Create JobPostingRaw object and map to common format
+            job_raw = JobPostingRaw(
+                source=source_name,
+                payload=raw_payload,
+                provider_job_id=raw_payload.get('job_id')
+            )
+            common_format = adapter.map_to_common(job_raw)
+            
+            # Normalize the common format (validate, add hash, apply defaults)
+            normalized = normalize_job_posting(common_format, source_name)
             normalized_jobs.append(normalized)
             stats['normalized'] += 1
             

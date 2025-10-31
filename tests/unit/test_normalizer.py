@@ -505,6 +505,78 @@ class TestTimestampParsing:
 
 
 # ============================================================================
+# Data Flow Integration Tests
+# ============================================================================
+
+class TestDataFlowIntegration:
+    """Tests for proper data flow from raw API response to normalized format"""
+    
+    def test_jsearch_raw_to_normalized_flow(self):
+        """Test complete flow: raw JSearch API response → map_to_common → normalize"""
+        from services.source_extractor.adapters.jsearch_adapter import JSearchAdapter
+        from services.source_extractor.base import JobPostingRaw
+        
+        # Simulate raw JSearch API response (as stored in raw.job_postings_raw)
+        raw_jsearch_payload = {
+            'job_id': 'abc123',
+            'job_title': 'Data Engineer',
+            'employer_name': 'Acme Corp',
+            'job_city': 'Montreal',
+            'job_state': 'QC',
+            'job_country': 'Canada',
+            'job_is_remote': False,
+            'job_employment_type': 'FULLTIME',
+            'job_min_salary': 80000,
+            'job_max_salary': 120000,
+            'job_salary_currency': 'CAD',
+            'job_description': 'We are hiring...',
+            'job_apply_link': 'https://example.com/apply',
+            'job_posted_at_datetime_utc': '2025-10-15T10:00:00Z',
+        }
+        
+        # Map raw API response to common format (what adapter does)
+        adapter = JSearchAdapter()
+        job_raw = JobPostingRaw(source='jsearch', payload=raw_jsearch_payload)
+        common_format = adapter.map_to_common(job_raw)
+        
+        # Verify common format has expected structure
+        assert 'job_title' in common_format
+        assert 'company' in common_format
+        assert 'location' in common_format
+        assert common_format['job_title'] == 'Data Engineer'
+        assert common_format['company'] == 'Acme Corp'
+        assert common_format['location'] == 'Montreal, QC, Canada'
+        
+        # Normalize the common format (what normalizer does)
+        normalized = normalize_job_posting(common_format, 'jsearch')
+        
+        # Verify normalized format
+        assert 'hash_key' in normalized
+        assert len(normalized['hash_key']) == 32
+        assert normalized['job_title'] == 'Data Engineer'
+        assert normalized['company'] == 'Acme Corp'
+        assert normalized['location'] == 'Montreal, QC, Canada'
+        assert normalized['remote_type'] == 'onsite'
+        assert normalized['contract_type'] == 'full_time'
+        assert normalized['source'] == 'jsearch'
+    
+    def test_raw_payload_without_mapping_fails(self):
+        """Test that normalizing raw API response directly fails (as expected)"""
+        # Raw JSearch API response (NOT mapped to common format)
+        raw_jsearch_payload = {
+            'job_id': 'abc123',
+            'job_title': 'Data Engineer',  # JSearch field name
+            'employer_name': 'Acme Corp',  # Wrong - should be 'company'
+            'job_city': 'Montreal',        # Wrong - should be part of 'location'
+        }
+        
+        # This should fail because fields don't match expected common format
+        with pytest.raises(NormalizationError):
+            # Missing required 'company' and 'location' fields
+            normalize_job_posting(raw_jsearch_payload, 'jsearch')
+
+
+# ============================================================================
 # Mark all tests as unit tests
 # ============================================================================
 

@@ -85,6 +85,7 @@ def normalize_data(**context):
     """
     import os
     import sys
+    from airflow.hooks.base import BaseHook
     
     # Add project root to path so we can import services
     project_root = '/opt/airflow'
@@ -100,11 +101,17 @@ def normalize_data(**context):
         from services.normalizer.db_operations import NormalizerDB, DatabaseError
         from services.normalizer.main import run_normalizer
         
-        # Get database URL from environment
-        database_url = os.getenv(
-            'DATABASE_URL',
-            'postgresql://job_etl_user:job_etl_pass@postgres:5432/job_etl'
-        )
+        # Get database URL from Airflow connection
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, using fallback: {e}")
+            database_url = os.getenv(
+                'DATABASE_URL',
+                'postgresql://job_etl_user:job_etl_pass@postgres:5432/job_etl'
+            )
         
         print(f"Connecting to database...")
         
