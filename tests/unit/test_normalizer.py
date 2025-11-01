@@ -19,7 +19,7 @@ Testing Concepts Used:
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from services.normalizer.hash_generator import (
     normalize_whitespace,
@@ -464,7 +464,7 @@ class TestTimestampParsing:
 
     def test_normalize_datetime_object(self):
         """Test that datetime objects are passed through"""
-        dt = datetime(2025, 10, 15, 10, 0, 0)
+        dt = datetime(2025, 10, 15, 10, 0, 0, tzinfo=timezone.utc)
         job = {
             'job_title': 'Data Engineer',
             'company': 'Acme Corp',
