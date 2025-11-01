@@ -33,48 +33,48 @@ class DatabaseError(Exception):
 class NormalizerDB:
     """
     Database interface for the normalizer service.
-    
+
     This class provides methods to:
     - Fetch unprocessed raw job postings
     - Insert/update normalized jobs in staging table
     - Track processing statistics
-    
+
     Uses context managers for proper connection handling.
     """
-    
+
     def __init__(self, connection_string: str):
         """
         Initialize database connection.
-        
+
         Args:
             connection_string: PostgreSQL connection URL
                              Format: postgresql://user:pass@host:port/dbname
-        
+
         Raises:
             DatabaseError: If connection fails
         """
         self.connection_string = connection_string
         self._conn: Optional[psycopg2.extensions.connection] = None
-        
+
         # Validate connection
         try:
             self._test_connection()
             logger.info("Database connection validated successfully")
         except Exception as e:
             raise DatabaseError(f"Failed to connect to database: {e}") from e
-    
+
     def _test_connection(self) -> None:
         """Test database connection by executing a simple query."""
         with self._get_connection() as conn, conn.cursor() as cur:
             cur.execute("SELECT 1")
-    
+
     @contextmanager
     def _get_connection(self) -> Generator[psycopg2.extensions.connection, None, None]:
         """
         Context manager for database connections.
-        
+
         Ensures connections are properly closed and transactions are committed/rolled back.
-        
+
         Yields:
             Database connection
         """
@@ -94,7 +94,7 @@ class NormalizerDB:
         finally:
             if conn:
                 conn.close()
-    
+
     def fetch_raw_jobs(
         self,
         source: Optional[str] = None,
@@ -103,23 +103,23 @@ class NormalizerDB:
     ) -> list[dict[str, Any]]:
         """
         Fetch raw job postings from raw.job_postings_raw table.
-        
+
         Args:
             source: Filter by source name (e.g., 'jsearch'). If None, fetch all sources.
             limit: Maximum number of jobs to fetch. If None, fetch all.
             min_collected_at: Only fetch jobs collected after this timestamp (ISO format).
                             If None, fetch all jobs.
-        
+
         Returns:
             List of dictionaries, each containing:
             - raw_id: UUID
             - source: str
             - payload: dict (parsed JSONB)
             - collected_at: datetime
-        
+
         Raises:
             DatabaseError: If query fails
-            
+
         Example:
             >>> db = NormalizerDB("postgresql://...")
             >>> jobs = db.fetch_raw_jobs(source='jsearch', limit=100)
@@ -130,7 +130,7 @@ class NormalizerDB:
             with self._get_connection() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 # Build query with optional filters
                 query = sql.SQL("""
-                        SELECT 
+                        SELECT
                             raw_id,
                             source,
                             payload,
@@ -176,26 +176,26 @@ class NormalizerDB:
                 extra={'error': str(e), 'pgcode': e.pgcode}
             )
             raise DatabaseError(f"Failed to fetch raw jobs: {e}") from e
-    
+
     def upsert_staging_job(self, job: dict[str, Any]) -> str:
         """
         Insert or update a normalized job in staging.job_postings_stg.
-        
+
         Uses PostgreSQL's ON CONFLICT to implement upsert logic:
         - If hash_key already exists: Update last_seen_at and other fields
         - If new: Insert with first_seen_at and last_seen_at
-        
+
         This ensures idempotency - running the same job multiple times is safe.
-        
+
         Args:
             job: Normalized job dictionary containing all required fields
-        
+
         Returns:
             The hash_key of the inserted/updated job
-            
+
         Raises:
             DatabaseError: If insert/update fails
-            
+
         Example:
             >>> normalized_job = {
             ...     'hash_key': 'a1b2c3d4...',
@@ -311,23 +311,23 @@ class NormalizerDB:
                 }
             )
             raise DatabaseError(f"Failed to upsert job: {e}") from e
-    
+
     def upsert_staging_jobs_batch(self, jobs: list[dict[str, Any]]) -> int:
         """
         Insert or update multiple normalized jobs in a single transaction.
-        
+
         This is more efficient than calling upsert_staging_job() multiple times
         because it uses a single database transaction.
-        
+
         Args:
             jobs: List of normalized job dictionaries
-        
+
         Returns:
             Number of jobs successfully upserted
-            
+
         Raises:
             DatabaseError: If batch upsert fails
-            
+
         Example:
             >>> jobs = [normalized_job1, normalized_job2, ...]
             >>> count = db.upsert_staging_jobs_batch(jobs)
@@ -336,10 +336,10 @@ class NormalizerDB:
         if not jobs:
             logger.warning("No jobs to upsert")
             return 0
-        
+
         success_count = 0
         failed_count = 0
-        
+
         try:
             with self._get_connection() as conn, conn.cursor() as cur:
                 for job in jobs:
@@ -413,19 +413,19 @@ class NormalizerDB:
                 extra={'error': str(e), 'pgcode': e.pgcode}
             )
             raise DatabaseError(f"Batch upsert failed: {e}") from e
-    
+
     def get_staging_stats(self) -> dict[str, Any]:
         """
         Get statistics about staging table contents.
-        
+
         Useful for monitoring and reporting.
-        
+
         Returns:
             Dictionary with statistics:
             - total_jobs: Total number of unique jobs
             - jobs_by_source: Count per source
             - latest_update: Most recent last_seen_at timestamp
-            
+
         Example:
             >>> stats = db.get_staging_stats()
             >>> print(f"Total jobs: {stats['total_jobs']}")
@@ -466,4 +466,5 @@ class NormalizerDB:
                 extra={'error': str(e)}
             )
             raise DatabaseError(f"Failed to get stats: {e}") from e
+
 

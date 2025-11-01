@@ -93,7 +93,7 @@ def extract_source_jsearch(**context):
                 raise ValueError(
                     "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
                     "or environment variable 'DATABASE_URL'"
-                )
+                ) from None
 
         # Resolve API configuration from Airflow Variables with env fallbacks
         def _var(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -206,7 +206,7 @@ def normalize_data(**context):
                 raise ValueError(
                     "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
                     "or environment variable 'DATABASE_URL'"
-                )
+                ) from None
 
         print("Connecting to database...")
 
