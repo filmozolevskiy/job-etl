@@ -41,32 +41,32 @@ from services.normalizer.normalize import (
 
 class TestHashGenerator:
     """Tests for hash key generation functions"""
-    
+
     def test_normalize_whitespace_basic(self):
         """Test basic whitespace normalization"""
         # Multiple spaces should become single space
         assert normalize_whitespace("Data   Engineer") == "Data Engineer"
-        
+
         # Leading/trailing whitespace should be removed
         assert normalize_whitespace("  Data Engineer  ") == "Data Engineer"
-        
+
         # Tabs and newlines should become spaces
         assert normalize_whitespace("Data\tEngineer\n") == "Data Engineer"
-    
+
     def test_normalize_whitespace_edge_cases(self):
         """Test edge cases for whitespace normalization"""
         # Empty string
         assert normalize_whitespace("") == ""
-        
+
         # None should return empty string
         assert normalize_whitespace(None) == ""
-        
+
         # Only whitespace should return empty string
         assert normalize_whitespace("   \t\n   ") == ""
-        
+
         # Already normalized string should remain unchanged
         assert normalize_whitespace("Data Engineer") == "Data Engineer"
-    
+
     def test_generate_hash_key_basic(self):
         """Test basic hash key generation"""
         hash_key = generate_hash_key(
@@ -74,43 +74,43 @@ class TestHashGenerator:
             "Data Engineer",
             "Montreal, QC"
         )
-        
+
         # Hash should be 32 characters (MD5 hex)
         assert len(hash_key) == 32
-        
+
         # Hash should be hexadecimal
         assert all(c in '0123456789abcdef' for c in hash_key)
-    
+
     def test_generate_hash_key_deterministic(self):
         """Test that same inputs produce same hash"""
         hash1 = generate_hash_key("Acme Corp", "Data Engineer", "Montreal, QC")
         hash2 = generate_hash_key("Acme Corp", "Data Engineer", "Montreal, QC")
-        
+
         assert hash1 == hash2
-    
+
     def test_generate_hash_key_case_insensitive(self):
         """Test that hash is case-insensitive"""
         hash1 = generate_hash_key("ACME CORP", "Data Engineer", "Montreal, QC")
         hash2 = generate_hash_key("acme corp", "data engineer", "montreal, qc")
-        
+
         # Different cases should produce same hash
         assert hash1 == hash2
-    
+
     def test_generate_hash_key_whitespace_normalized(self):
         """Test that hash normalizes whitespace"""
         hash1 = generate_hash_key("Acme  Corp", "Data   Engineer", "Montreal,  QC")
         hash2 = generate_hash_key("Acme Corp", "Data Engineer", "Montreal, QC")
-        
+
         # Different whitespace should produce same hash
         assert hash1 == hash2
-    
+
     def test_generate_hash_key_different_inputs(self):
         """Test that different inputs produce different hashes"""
         hash1 = generate_hash_key("Acme Corp", "Data Engineer", "Montreal, QC")
         hash2 = generate_hash_key("Globex Inc", "Data Engineer", "Montreal, QC")
         hash3 = generate_hash_key("Acme Corp", "Software Engineer", "Montreal, QC")
         hash4 = generate_hash_key("Acme Corp", "Data Engineer", "Toronto, ON")
-        
+
         # All hashes should be different
         assert hash1 != hash2
         assert hash1 != hash3
@@ -118,7 +118,7 @@ class TestHashGenerator:
         assert hash2 != hash3
         assert hash2 != hash4
         assert hash3 != hash4
-    
+
     @pytest.mark.parametrize("company,title,location", [
         ("", "Data Engineer", "Montreal, QC"),
         ("Acme Corp", "", "Montreal, QC"),
@@ -131,16 +131,16 @@ class TestHashGenerator:
         """Test that missing fields raise ValueError"""
         with pytest.raises(ValueError):
             generate_hash_key(company, title, location)
-    
+
     def test_validate_hash_key_valid(self):
         """Test validation of valid hash keys"""
         # Generate a real hash
         valid_hash = generate_hash_key("Acme Corp", "Data Engineer", "Montreal, QC")
         assert validate_hash_key(valid_hash) is True
-        
+
         # Test a manually created valid hash
         assert validate_hash_key("a1b2c3d4e5f6789012345678901234ab") is True
-    
+
     @pytest.mark.parametrize("invalid_hash", [
         "too_short",                             # Too short
         "toolongbecauseithastoomanycharacters",  # Too long
@@ -160,7 +160,7 @@ class TestHashGenerator:
 
 class TestNormalizeJobPosting:
     """Tests for job posting normalization"""
-    
+
     @pytest.fixture
     def valid_raw_job(self):
         """Fixture providing a valid raw job posting"""
@@ -181,20 +181,20 @@ class TestNormalizeJobPosting:
             'posted_at': '2025-10-15T10:00:00Z',
             'apply_url': 'https://example.com/apply/123',
         }
-    
+
     def test_normalize_valid_job(self, valid_raw_job):
         """Test normalization of a valid job posting"""
         normalized = normalize_job_posting(valid_raw_job, 'test_source')
-        
+
         # Check that all required fields are present
         assert 'hash_key' in normalized
         assert len(normalized['hash_key']) == 32
-        
+
         assert normalized['job_title'] == 'Data Engineer'
         assert normalized['company'] == 'Acme Corp'
         assert normalized['location'] == 'Montreal, QC, Canada'
         assert normalized['source'] == 'test_source'
-        
+
         # Check optional fields
         assert normalized['provider_job_id'] == 'job_123'
         assert normalized['remote_type'] == 'hybrid'
@@ -204,7 +204,7 @@ class TestNormalizeJobPosting:
         assert normalized['salary_max'] == 120000
         assert normalized['salary_currency'] == 'CAD'
         assert normalized['skills_raw'] == ['python', 'sql', 'airflow']
-    
+
     def test_normalize_missing_optional_fields(self):
         """Test normalization with missing optional fields"""
         minimal_job = {
@@ -212,16 +212,16 @@ class TestNormalizeJobPosting:
             'company': 'Acme Corp',
             'location': 'Montreal, QC',
         }
-        
+
         normalized = normalize_job_posting(minimal_job, 'test_source')
-        
+
         # Required fields should be present
         assert normalized['job_title'] == 'Data Engineer'
         assert normalized['company'] == 'Acme Corp'
         assert normalized['location'] == 'Montreal, QC'
         assert normalized['source'] == 'test_source'
         assert 'hash_key' in normalized
-        
+
         # Optional fields should have defaults or None
         assert normalized['remote_type'] == 'unknown'
         assert normalized['contract_type'] == 'unknown'
@@ -229,16 +229,16 @@ class TestNormalizeJobPosting:
         assert normalized['salary_min'] is None
         assert normalized['salary_max'] is None
         assert normalized['provider_job_id'] is None
-    
+
     @pytest.mark.parametrize("missing_field", ['job_title', 'company', 'location'])
     def test_normalize_missing_required_fields(self, valid_raw_job, missing_field):
         """Test that missing required fields raise NormalizationError"""
         # Remove the required field
         del valid_raw_job[missing_field]
-        
+
         with pytest.raises(NormalizationError):
             normalize_job_posting(valid_raw_job, 'test_source')
-    
+
     @pytest.mark.parametrize("field,invalid_value", [
         ('job_title', ''),
         ('job_title', None),
@@ -252,10 +252,10 @@ class TestNormalizeJobPosting:
     def test_normalize_invalid_required_fields(self, valid_raw_job, field, invalid_value):
         """Test that invalid required fields raise NormalizationError"""
         valid_raw_job[field] = invalid_value
-        
+
         with pytest.raises(NormalizationError):
             normalize_job_posting(valid_raw_job, 'test_source')
-    
+
     def test_normalize_whitespace_in_fields(self):
         """Test that leading/trailing whitespace is stripped"""
         job = {
@@ -263,9 +263,9 @@ class TestNormalizeJobPosting:
             'company': '  Acme Corp  ',
             'location': '  Montreal, QC  ',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Whitespace should be stripped
         assert normalized['job_title'] == 'Data Engineer'
         assert normalized['company'] == 'Acme Corp'
@@ -278,7 +278,7 @@ class TestNormalizeJobPosting:
 
 class TestEnumValidation:
     """Tests for enum field validation and defaults"""
-    
+
     @pytest.mark.parametrize("remote_type", list(VALID_REMOTE_TYPES))
     def test_normalize_valid_remote_types(self, remote_type):
         """Test that all valid remote_type values are accepted"""
@@ -288,10 +288,10 @@ class TestEnumValidation:
             'location': 'Montreal, QC',
             'remote_type': remote_type,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
         assert normalized['remote_type'] == remote_type
-    
+
     @pytest.mark.parametrize("contract_type", list(VALID_CONTRACT_TYPES))
     def test_normalize_valid_contract_types(self, contract_type):
         """Test that all valid contract_type values are accepted"""
@@ -301,10 +301,10 @@ class TestEnumValidation:
             'location': 'Montreal, QC',
             'contract_type': contract_type,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
         assert normalized['contract_type'] == contract_type
-    
+
     @pytest.mark.parametrize("company_size", list(VALID_COMPANY_SIZES))
     def test_normalize_valid_company_sizes(self, company_size):
         """Test that all valid company_size values are accepted"""
@@ -314,10 +314,10 @@ class TestEnumValidation:
             'location': 'Montreal, QC',
             'company_size': company_size,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
         assert normalized['company_size'] == company_size
-    
+
     @pytest.mark.parametrize("invalid_value", [
         'invalid_type',
         'full-time',  # Wrong format (should be full_time)
@@ -331,11 +331,11 @@ class TestEnumValidation:
             'location': 'Montreal, QC',
             'remote_type': invalid_value,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
         # Invalid values should default to 'unknown'
         assert normalized['remote_type'] == 'unknown'
-    
+
     def test_normalize_case_insensitive_enums(self):
         """Test that enum values are case-insensitive"""
         job = {
@@ -345,9 +345,9 @@ class TestEnumValidation:
             'remote_type': 'REMOTE',  # Uppercase
             'contract_type': 'Full_Time',  # Mixed case
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should be normalized to lowercase
         assert normalized['remote_type'] == 'remote'
         assert normalized['contract_type'] == 'full_time'
@@ -359,7 +359,7 @@ class TestEnumValidation:
 
 class TestSalaryNormalization:
     """Tests for salary field handling"""
-    
+
     def test_normalize_valid_salary_range(self):
         """Test normalization of valid salary range"""
         job = {
@@ -370,13 +370,13 @@ class TestSalaryNormalization:
             'salary_max': 120000,
             'salary_currency': 'CAD',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         assert normalized['salary_min'] == 80000.0
         assert normalized['salary_max'] == 120000.0
         assert normalized['salary_currency'] == 'CAD'
-    
+
     def test_normalize_swapped_salary_min_max(self):
         """Test that min > max is automatically fixed"""
         job = {
@@ -386,13 +386,13 @@ class TestSalaryNormalization:
             'salary_min': 120000,  # Swapped
             'salary_max': 80000,   # Swapped
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should be automatically swapped
         assert normalized['salary_min'] == 80000.0
         assert normalized['salary_max'] == 120000.0
-    
+
     @pytest.mark.parametrize("salary_str", ['80000', '120000.50'])
     def test_normalize_string_salaries(self, salary_str):
         """Test that string salary values are converted to float"""
@@ -402,13 +402,13 @@ class TestSalaryNormalization:
             'location': 'Montreal, QC',
             'salary_min': salary_str,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should be converted to float
         assert isinstance(normalized['salary_min'], float)
         assert normalized['salary_min'] == float(salary_str)
-    
+
     def test_normalize_missing_salary(self):
         """Test that missing salary fields are None"""
         job = {
@@ -416,9 +416,9 @@ class TestSalaryNormalization:
             'company': 'Acme Corp',
             'location': 'Montreal, QC',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         assert normalized['salary_min'] is None
         assert normalized['salary_max'] is None
         assert normalized['salary_currency'] is None
@@ -430,7 +430,7 @@ class TestSalaryNormalization:
 
 class TestTimestampParsing:
     """Tests for posted_at timestamp parsing"""
-    
+
     def test_normalize_iso_timestamp(self):
         """Test parsing of ISO 8601 timestamp"""
         job = {
@@ -439,15 +439,15 @@ class TestTimestampParsing:
             'location': 'Montreal, QC',
             'posted_at': '2025-10-15T10:00:00Z',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should be parsed as datetime
         assert isinstance(normalized['posted_at'], datetime)
         assert normalized['posted_at'].year == 2025
         assert normalized['posted_at'].month == 10
         assert normalized['posted_at'].day == 15
-    
+
     def test_normalize_unix_timestamp(self):
         """Test parsing of Unix timestamp"""
         job = {
@@ -456,12 +456,12 @@ class TestTimestampParsing:
             'location': 'Montreal, QC',
             'posted_at': 1729000000,  # Unix timestamp
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should be parsed as datetime
         assert isinstance(normalized['posted_at'], datetime)
-    
+
     def test_normalize_datetime_object(self):
         """Test that datetime objects are passed through"""
         dt = datetime(2025, 10, 15, 10, 0, 0)
@@ -471,12 +471,12 @@ class TestTimestampParsing:
             'location': 'Montreal, QC',
             'posted_at': dt,
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Should remain datetime object
         assert normalized['posted_at'] == dt
-    
+
     def test_normalize_invalid_timestamp(self):
         """Test that invalid timestamps become None"""
         job = {
@@ -485,12 +485,12 @@ class TestTimestampParsing:
             'location': 'Montreal, QC',
             'posted_at': 'invalid_date',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         # Invalid timestamp should be None
         assert normalized['posted_at'] is None
-    
+
     def test_normalize_missing_timestamp(self):
         """Test that missing timestamp is None"""
         job = {
@@ -498,9 +498,9 @@ class TestTimestampParsing:
             'company': 'Acme Corp',
             'location': 'Montreal, QC',
         }
-        
+
         normalized = normalize_job_posting(job, 'test_source')
-        
+
         assert normalized['posted_at'] is None
 
 
@@ -510,12 +510,12 @@ class TestTimestampParsing:
 
 class TestDataFlowIntegration:
     """Tests for proper data flow from raw API response to normalized format"""
-    
+
     def test_jsearch_raw_to_normalized_flow(self):
         """Test complete flow: raw JSearch API response → map_to_common → normalize"""
         from services.source_extractor.adapters.jsearch_adapter import JSearchAdapter
         from services.source_extractor.base import JobPostingRaw
-        
+
         # Simulate raw JSearch API response (as stored in raw.job_postings_raw)
         raw_jsearch_payload = {
             'job_id': 'abc123',
@@ -533,12 +533,12 @@ class TestDataFlowIntegration:
             'job_apply_link': 'https://example.com/apply',
             'job_posted_at_datetime_utc': '2025-10-15T10:00:00Z',
         }
-        
+
         # Map raw API response to common format (what adapter does)
         adapter = JSearchAdapter()
         job_raw = JobPostingRaw(source='jsearch', payload=raw_jsearch_payload)
         common_format = adapter.map_to_common(job_raw)
-        
+
         # Verify common format has expected structure
         assert 'job_title' in common_format
         assert 'company' in common_format
@@ -546,10 +546,10 @@ class TestDataFlowIntegration:
         assert common_format['job_title'] == 'Data Engineer'
         assert common_format['company'] == 'Acme Corp'
         assert common_format['location'] == 'Montreal, QC, Canada'
-        
+
         # Normalize the common format (what normalizer does)
         normalized = normalize_job_posting(common_format, 'jsearch')
-        
+
         # Verify normalized format
         assert 'hash_key' in normalized
         assert len(normalized['hash_key']) == 32
@@ -559,7 +559,7 @@ class TestDataFlowIntegration:
         assert normalized['remote_type'] == 'onsite'
         assert normalized['contract_type'] == 'full_time'
         assert normalized['source'] == 'jsearch'
-    
+
     def test_raw_payload_without_mapping_fails(self):
         """Test that normalizing raw API response directly fails (as expected)"""
         # Raw JSearch API response (NOT mapped to common format)
@@ -569,7 +569,7 @@ class TestDataFlowIntegration:
             'employer_name': 'Acme Corp',  # Wrong - should be 'company'
             'job_city': 'Montreal',        # Wrong - should be part of 'location'
         }
-        
+
         # This should fail because fields don't match expected common format
         with pytest.raises(NormalizationError):
             # Missing required 'company' and 'location' fields

@@ -13,7 +13,7 @@ Key Responsibilities:
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from .hash_generator import generate_hash_key
@@ -107,7 +107,7 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
         try:
             hash_key = generate_hash_key(company, job_title, location)
         except ValueError as e:
-            raise NormalizationError(f"Failed to generate hash key: {e}")
+            raise NormalizationError(f"Failed to generate hash key: {e}") from e
 
         # Normalize enum fields with defaults
         remote_type = _normalize_enum(
@@ -139,18 +139,17 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
         salary_max = _parse_numeric(raw_data.get('salary_max'), 'salary_max')
 
         # Validate salary logic
-        if salary_min is not None and salary_max is not None:
-            if salary_min > salary_max:
-                logger.warning(
-                    "salary_min > salary_max, swapping values",
-                    extra={
-                        'company': company,
-                        'job_title': job_title,
-                        'salary_min': salary_min,
-                        'salary_max': salary_max,
-                    }
-                )
-                salary_min, salary_max = salary_max, salary_min
+        if salary_min is not None and salary_max is not None and salary_min > salary_max:
+            logger.warning(
+                "salary_min > salary_max, swapping values",
+                extra={
+                    'company': company,
+                    'job_title': job_title,
+                    'salary_min': salary_min,
+                    'salary_max': salary_max,
+                }
+            )
+            salary_min, salary_max = salary_max, salary_min
 
         # Build normalized job posting
         normalized = {
@@ -198,7 +197,7 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
                 'raw_data_keys': list(raw_data.keys()) if raw_data else None,
             }
         )
-        raise NormalizationError(f"Unexpected normalization error: {e}")
+        raise NormalizationError(f"Unexpected normalization error: {e}") from e
 
 
 def _normalize_enum(
@@ -288,7 +287,7 @@ def _parse_timestamp(value: Any) -> Optional[datetime]:
     # Try parsing Unix timestamp
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(value)
+            return datetime.fromtimestamp(value, tz=timezone.utc)
         except (ValueError, OSError):
             logger.warning(
                 "Failed to parse Unix timestamp",

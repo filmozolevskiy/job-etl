@@ -8,8 +8,8 @@ Available adapters:
 - JSearchAdapter: JSearch API integration (jsearch_adapter.py)
 """
 
-from .mock_adapter import MockAdapter
 from .jsearch_adapter import JSearchAdapter
+from .mock_adapter import MockAdapter
 
 __all__ = ["MockAdapter", "JSearchAdapter"]
 __version__ = "0.1.0"
