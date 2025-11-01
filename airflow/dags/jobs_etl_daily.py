@@ -21,6 +21,7 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
+from airflow.models import Variable
 import pendulum
 
 
@@ -46,30 +47,122 @@ default_args = {
 
 
 # -----------------------------------------------------------------------------
-# Task Callable Functions (Placeholders for now)
+# Task Callable Functions
 # -----------------------------------------------------------------------------
 
 def extract_source_jsearch(**context):
     """
     Extract job postings from JSearch API.
 
-    For now, this is a no-op placeholder. In the next phase, this will:
+    This will:
     - Call the source-extractor service (via DockerOperator)
     - Pass API credentials from Airflow Variables/Connections
     - Store raw JSON to raw.job_postings_raw table
     - Return count of extracted jobs
     """
+    import os
+    import sys
+    from typing import Optional
+    from airflow.hooks.base import BaseHook
+
+    # Ensure project root is on sys.path to import services
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     print("=" * 60)
-    print("EXTRACT TASK (JSearch API)")
-    print("=" * 60)
-    print("TODO: Implement source extraction")
-    print("  - Will call source-extractor service")
-    print("  - Store raw JSON to raw.job_postings_raw")
-    print("  - Return job count for XCom")
+    print("EXTRACT TASK (JSearch API) - Starting")
     print("=" * 60)
 
-    # Placeholder return value (will be replaced with actual count)
-    return {"source": "jsearch", "extracted_count": 0}
+    try:
+        # Lazy imports after sys.path updated
+        from services.source_extractor.adapters.jsearch_adapter import (
+            JSearchAdapter,
+        )
+        from services.source_extractor.db_storage import JobStorage
+
+        # Resolve database URL from Airflow connection with fallback to env
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                raise ValueError(
+                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                    "or environment variable 'DATABASE_URL'"
+                )
+
+        # Resolve API configuration from Airflow Variables with env fallbacks
+        def _var(name: str, default: Optional[str] = None) -> Optional[str]:
+            try:
+                return Variable.get(name)
+            except Exception:
+                return os.getenv(name, default)
+
+        jsearch_api_key = _var('JSEARCH_API_KEY')
+        jsearch_base_url = _var('JSEARCH_BASE_URL', 'https://api.openwebninja.com')
+        jsearch_query = _var('JSEARCH_QUERY', 'analytics engineer')
+        jsearch_location = _var('JSEARCH_LOCATION', 'United States')
+        jsearch_date_posted = _var('JSEARCH_DATE_POSTED', 'month')
+        try:
+            jsearch_max_jobs = int(_var('JSEARCH_MAX_JOBS', '20') or '20')
+        except ValueError:
+            jsearch_max_jobs = 20
+
+        if not jsearch_api_key:
+            raise ValueError(
+                "JSEARCH_API_KEY must be set as an Airflow Variable or environment variable"
+            )
+
+        print("Initializing JSearch adapter with configuration:")
+        print(f"  base_url: {jsearch_base_url}")
+        print(f"  query: {jsearch_query}")
+        print(f"  location: {jsearch_location}")
+        print(f"  date_posted: {jsearch_date_posted}")
+        print(f"  max_jobs: {jsearch_max_jobs}")
+
+        adapter = JSearchAdapter(
+            api_key=jsearch_api_key,
+            base_url=jsearch_base_url,
+            max_jobs=jsearch_max_jobs,
+            query=jsearch_query,
+            location=jsearch_location,
+            date_posted=jsearch_date_posted,
+        )
+
+        total_saved = 0
+
+        with JobStorage(database_url) as storage:
+            next_token: Optional[str] = None
+            while True:
+                jobs, next_token = adapter.fetch(next_token)
+                if not jobs:
+                    break
+                raw_ids = storage.save_jobs_batch(jobs)
+                total_saved += len(raw_ids)
+                print(f"Saved batch: {len(raw_ids)} (total_saved={total_saved})")
+                if not next_token:
+                    break
+
+        print("=" * 60)
+        print("EXTRACT TASK (JSearch API) - Completed Successfully")
+        print("=" * 60)
+        print(f"Extracted and saved jobs: {total_saved}")
+        print("=" * 60)
+
+        return {"source": "jsearch", "extracted_count": total_saved}
+
+    except Exception as e:
+        print("=" * 60)
+        print("EXTRACT TASK (JSearch API) - Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
 
 
 def normalize_data(**context):
@@ -107,11 +200,13 @@ def normalize_data(**context):
             database_url = conn.get_uri().replace('postgres://', 'postgresql://')
             print("Using Airflow connection: postgres_default")
         except Exception as e:
-            print(f"Warning: Could not get Airflow connection, using fallback: {e}")
-            database_url = os.getenv(
-                'DATABASE_URL',
-                'postgresql://job_etl_user:job_etl_pass@postgres:5432/job_etl'
-            )
+            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                raise ValueError(
+                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                    "or environment variable 'DATABASE_URL'"
+                )
 
         print("Connecting to database...")
 
