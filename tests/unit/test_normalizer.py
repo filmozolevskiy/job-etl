@@ -535,7 +535,8 @@ class TestDataFlowIntegration:
         }
 
         # Map raw API response to common format (what adapter does)
-        adapter = JSearchAdapter()
+        # Provide API key for initialization (required by JSearchAdapter)
+        adapter = JSearchAdapter(api_key="test-key-for-unit-testing")
         job_raw = JobPostingRaw(source='jsearch', payload=raw_jsearch_payload)
         common_format = adapter.map_to_common(job_raw)
 
