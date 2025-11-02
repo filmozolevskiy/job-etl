@@ -3,15 +3,14 @@ Job-ETL Daily DAG
 
 This DAG orchestrates the daily ETL pipeline for job postings:
 1. Extracts job data from configured sources (JSearch API)
-2. Loads raw data to staging via dbt
-3. Normalizes data to canonical format
-4. Enriches with skills, standardized titles, locations, salary
-5. Runs core dbt models (dimensions and facts)
-6. Deduplicates based on hash_key
-7. Ranks jobs based on configurable weights
-8. Runs data quality tests
-9. Publishes results to Tableau Hyper files
-10. Sends webhook notification with summary
+2. Normalizes data to canonical format (Python normalizer service)
+3. Enriches with skills, standardized titles, locations, salary
+4. Runs core dbt models (dimensions and facts)
+5. Deduplicates based on hash_key
+6. Ranks jobs based on configurable weights
+7. Runs data quality tests
+8. Publishes results to Tableau Hyper files
+9. Sends webhook notification with summary
 
 Schedule: Daily at 07:00 America/Toronto
 """
@@ -96,20 +95,20 @@ def run_dbt_models(models: str, **context):
 
         # Create profiles.yml
         profiles_yml = f"""job_dbt:
-  target: docker
-  outputs:
-    docker:
-      type: postgres
-      host: {db_host}
-      port: {db_port}
-      user: {db_user}
-      password: '{db_password}'
-      dbname: {db_name}
-      schema: staging
-      threads: 4
-      keepalives_idle: 0
-      connect_timeout: 10
-      search_path: "staging,raw,marts,public"
+        target: docker
+        outputs:
+            docker:
+                type: postgres
+                host: {db_host}
+                port: {db_port}
+                user: {db_user}
+                password: '{db_password}'
+                dbname: {db_name}
+                schema: staging
+                threads: 4
+                keepalives_idle: 0
+                connect_timeout: 10
+                search_path: "staging,raw,marts,public"
 """
         with open(f'{profiles_dir}/profiles.yml', 'w') as f:
             f.write(profiles_yml)

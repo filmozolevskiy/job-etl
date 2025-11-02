@@ -51,7 +51,7 @@
 
 * [x] **Airflow DAG skeleton (`jobs_etl_daily`)**
 
-  * **AC:** DAG contains tasks: `start → extract_{source} → load_raw_to_staging → normalize → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
+  * **AC:** DAG contains tasks: `start → extract_{source} → normalize → enrich → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
 
 * [x] **Normalizer service**
 
@@ -68,7 +68,7 @@
 * [x] **Deduplication logic (upsert)**
 
   * **AC:** `hash_key = md5(normalized company|title|location)`; re-runs update `last_seen_at`, preserve `first_seen_at`.
-  * **Note:** Implemented in normalizer service and dbt stg_job_postings model
+  * **Note:** Implemented in Python normalizer service
 
 * [ ] **Minimal ranker (stub scoring)**
 

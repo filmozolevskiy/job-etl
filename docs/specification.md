@@ -89,16 +89,15 @@
 
 1. `start` (Dummy)
 2. `extract_{source}` (dynamic mapped tasks per source)
-3. `load_raw_to_staging` (dbt run `stg_*`)
-4. `normalize` (service call / container)
-5. `enrich` (service call / container)
-6. `dbt_models_core` (int_/dim_/fact_)
-7. `dedupe_consolidate` (SQL/dbt incremental model)
-8. `rank` (service call / container)
-9. `dbt_tests` (schema+generic)
-10. `publish_hyper` (publisher-hyper)
-11. `notify_webhook_daily` (summary counts + failures)
-12. `end` (Dummy)
+3. `normalize` (service call / container) - Python normalizer populates staging directly
+4. `enrich` (service call / container)
+5. `dbt_models_core` (int_/dim_/fact_)
+6. `dedupe_consolidate` (SQL/dbt incremental model)
+7. `rank` (service call / container)
+8. `dbt_tests` (schema+generic)
+9. `publish_hyper` (publisher-hyper)
+10. `notify_webhook_daily` (summary counts + failures)
+11. `end` (Dummy)
 
 **Reliability & Idempotency**
 
