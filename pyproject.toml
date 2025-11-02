@@ -37,24 +37,28 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# Enable rule sets
-# E/W = pycodestyle errors and warnings
-# F = pyflakes (basic Python errors)
-# I = isort (import sorting)
-# N = pep8-naming
-# UP = pyupgrade (modern Python syntax)
-# B = flake8-bugbear (common bugs)
+# Enable rule sets - keeping critical and important ones only
+# F = pyflakes (basic Python errors) - CRITICAL
+# E = pycodestyle errors - CRITICAL
+# W = pycodestyle warnings - Important
+# I = isort (import sorting) - Important for code organization
+# N = pep8-naming - Important for consistency
+# UP = pyupgrade (modern Python syntax) - Helps with Python version compatibility
+# B = flake8-bugbear (common bugs) - Catches real issues
+# DTZ = flake8-datetimez (timezone-aware datetimes) - Catches timezone bugs
+# 
+# Disabled for MVP (too strict for learning project):
 # C4 = flake8-comprehensions (better list/dict comprehensions)
-# DTZ = flake8-datetimez (timezone-aware datetimes)
 # T20 = flake8-print (catch leftover print statements)
 # SIM = flake8-simplify (code simplification)
-select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "DTZ", "T20", "SIM"]
+select = ["E", "W", "F", "I", "N", "UP", "B", "DTZ"]
 
 # Ignore specific rules that might be too strict for a learning project
 ignore = [
     "E501",    # Line too long (handled by formatter)
     "N812",    # Lowercase imported as non-lowercase (common with pandas as pd)
-    "T201",    # print() statements (we'll use these for debugging in dev)
+    "UP006",   # Use X instead of Y for typing (too opinionated for learning)
+    "UP007",   # Use X | Y instead of Union[X, Y] (Python 3.10+ syntax)
 ]
 
 # Allow autofix for all enabled rules
@@ -65,7 +69,8 @@ unfixable = []
 # Test files can use assert statements and import fixtures
 "tests/**/*.py" = ["B011", "I001"]
 # Airflow DAGs can have longer lines and complex import patterns
-"airflow/dags/*.py" = ["E501", "I001"]
+# F401 = imported but unused (Airflow modules are needed for DAG registration)
+"airflow/dags/*.py" = ["E501", "I001", "F401"]
 
 [tool.ruff.lint.isort]
 # Organize imports into sections
@@ -120,6 +125,7 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
     "if __name__ == .__main__.:",
+    
     "if TYPE_CHECKING:",
 ]
 

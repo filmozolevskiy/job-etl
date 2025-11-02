@@ -1,0 +1,32 @@
+version: 2
+
+sources:
+  - name: staging
+    description: "Staging data from the normalizer service"
+    schema: staging
+    tables:
+      - name: job_postings_stg
+        description: "Normalized job postings from the Python normalizer service"
+        columns:
+          - name: hash_key
+            description: "Primary key for deduplication"
+            tests:
+              - unique
+              - not_null
+          - name: job_title
+            description: "Job title"
+            tests:
+              - not_null
+          - name: company
+            description: "Company name"
+            tests:
+              - not_null
+          - name: location
+            description: "Job location"
+            tests:
+              - not_null
+          - name: source
+            description: "Source provider"
+            tests:
+              - not_null
+

@@ -14,9 +14,8 @@ All integration tests in `tests/integration/` have been converted to placeholder
 ### Files Modified:
 1. `tests/integration/test_normalizer_integration.py` - Replaced with placeholder
 2. `tests/integration/test_jsearch_integration.py` - Replaced with placeholder  
-3. `tests/integration/test_example_integration.py` - Added skip decorators
-4. `docs/testing-setup.md` - Updated with current status and re-enablement instructions
-5. `docs/integration-tests-status.md` - This file (status summary)
+3. `docs/testing-setup.md` - Updated with current status and re-enablement instructions
+4. `docs/integration-tests-status.md` - This file (status summary)
 
 ### Test Results:
 ```bash

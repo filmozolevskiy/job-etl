@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     volumes:
       - pgadmin_data:/var/lib/pgadmin
@@ -212,7 +212,7 @@ services:
       AIRFLOW__CORE__BASE_LOG_FOLDER: /opt/airflow/logs
       AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
       AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
-      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
       POSTGRES_USER: ${POSTGRES_USER:-job_etl_user}
       POSTGRES_DB: ${POSTGRES_DB:-job_etl}
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}

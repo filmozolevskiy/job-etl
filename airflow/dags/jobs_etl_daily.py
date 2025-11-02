@@ -50,6 +50,120 @@ default_args = {
 # Task Callable Functions
 # -----------------------------------------------------------------------------
 
+def run_dbt_models(models: str, **context):
+    """
+    Run dbt models with the specified selection.
+    
+    Args:
+        models: Model selection string (e.g., "stg_*", "dim_* fact_*")
+    """
+    import os
+    import subprocess
+    from airflow.hooks.base import BaseHook
+    
+    print("=" * 60)
+    print(f"DBT TASK - Running models: {models}")
+    print("=" * 60)
+    
+    try:
+        # Get database credentials from Airflow connection
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            db_host = conn.host
+            db_port = conn.port
+            db_user = conn.login
+            db_password = conn.password
+            db_name = conn.schema  # In Airflow connection, schema is the database name
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            db_host = os.getenv('POSTGRES_HOST', 'postgres')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+            db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
+            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+        
+        # Set up dbt environment
+        project_dir = '/opt/airflow/dbt/job_dbt'
+        profiles_dir = '/tmp/dbt_profiles'
+        target_path = '/tmp/dbt_target'
+        log_path = '/tmp/dbt_logs'
+        
+        # Create temporary directories
+        os.makedirs(profiles_dir, exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
+        os.makedirs(log_path, exist_ok=True)
+        
+        # Create profiles.yml
+        profiles_yml = f"""job_dbt:
+  target: docker
+  outputs:
+    docker:
+      type: postgres
+      host: {db_host}
+      port: {db_port}
+      user: {db_user}
+      password: '{db_password}'
+      dbname: {db_name}
+      schema: staging
+      threads: 4
+      keepalives_idle: 0
+      connect_timeout: 10
+      search_path: "staging,raw,marts,public"
+"""
+        with open(f'{profiles_dir}/profiles.yml', 'w') as f:
+            f.write(profiles_yml)
+        
+        # Run dbt command
+        cmd = [
+            'dbt',
+            'run',
+            '--models', models,
+            '--project-dir', project_dir,
+            '--profiles-dir', profiles_dir,
+            '--target-path', target_path,
+            '--log-path', log_path
+        ]
+        
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        
+        print(result.stdout)
+        if result.stderr:
+            print("STDERR:", result.stderr)
+        
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+        
+        print("=" * 60)
+        print(f"DBT TASK - Successfully ran models: {models}")
+        print("=" * 60)
+        
+        return {"models_run": models, "status": "success"}
+        
+    except subprocess.CalledProcessError as e:
+        print("=" * 60)
+        print(f"DBT TASK - Failed with return code {e.returncode}")
+        print("=" * 60)
+        raise
+    except Exception as e:
+        print("=" * 60)
+        print(f"DBT TASK - Unexpected error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
+
+
+def run_core_dbt_models(**context):
+    """Run core dbt models (dimensions and facts)."""
+    return run_dbt_models(models="dim_* fact_*", **context)
+
+
 def extract_source_jsearch(**context):
     """
     Extract job postings from JSearch API.
@@ -400,27 +514,7 @@ with DAG(
     )
 
     # -------------------------------------------------------------------------
-    # Task 3: Load raw data to staging (dbt)
-    # -------------------------------------------------------------------------
-    load_raw_to_staging = BashOperator(
-        task_id="load_raw_to_staging",
-        bash_command="""
-        echo "Running dbt staging models..."
-        echo "TODO: cd /opt/airflow/dbt/job_dbt && dbt run --models stg_*"
-        echo "This will transform raw.job_postings_raw to staging.job_postings_stg"
-        """,
-        retries=2,
-        doc_md="""
-        **dbt: Load raw data to staging**
-
-        - Runs dbt models: stg_job_postings
-        - Transforms raw JSON to typed, cleaned staging tables
-        - Applies enums, trims whitespace, normalizes nulls
-        """
-    )
-
-    # -------------------------------------------------------------------------
-    # Task 4: Normalize data
+    # Task 3: Normalize data
     # -------------------------------------------------------------------------
     normalize = PythonOperator(
         task_id="normalize",
@@ -455,13 +549,9 @@ with DAG(
     # -------------------------------------------------------------------------
     # Task 6: Run core dbt models (intermediate, dimensions, facts)
     # -------------------------------------------------------------------------
-    dbt_models_core = BashOperator(
+    dbt_models_core = PythonOperator(
         task_id="dbt_models_core",
-        bash_command="""
-        echo "Running dbt core models..."
-        echo "TODO: cd /opt/airflow/dbt/job_dbt && dbt run --models int_* dim_* fact_*"
-        echo "This will create marts.dim_companies and marts.fact_jobs"
-        """,
+        python_callable=run_core_dbt_models,
         retries=2,
         doc_md="""
         **dbt: Build core models**
@@ -584,10 +674,9 @@ with DAG(
     # Task Dependencies (Define the execution order)
     # -------------------------------------------------------------------------
 
-    # Linear flow: start â†’ extract â†’ load â†’ normalize â†’ enrich â†’ models â†’ dedupe â†’ rank â†’ tests â†’ publish â†’ notify â†’ end
+    # Linear flow: start → extract → normalize → enrich → models → dedupe → rank → tests → publish → notify → end
     start >> extract_jsearch
-    extract_jsearch >> load_raw_to_staging
-    load_raw_to_staging >> normalize
+    extract_jsearch >> normalize
     normalize >> enrich
     enrich >> dbt_models_core
     dbt_models_core >> dedupe_consolidate
