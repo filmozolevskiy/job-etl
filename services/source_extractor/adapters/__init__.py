@@ -5,8 +5,11 @@ for different job posting APIs.
 
 Available adapters:
 - MockAdapter: For testing purposes (mock_adapter.py)
-- (More adapters will be added as we integrate with real APIs)
+- JSearchAdapter: JSearch API integration (jsearch_adapter.py)
 """
 
-__version__ = "0.1.0"
+from .jsearch_adapter import JSearchAdapter
+from .mock_adapter import MockAdapter
 
+__all__ = ["MockAdapter", "JSearchAdapter"]
+__version__ = "0.1.0"

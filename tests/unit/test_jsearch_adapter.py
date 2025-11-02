@@ -603,3 +603,8 @@ class TestJSearchAdapterEdgeCases:
         assert adapter.total_jobs_fetched == 18  # Cumulative count
         assert next_page2 == "3"  # Still has next page available
 
+# ============================================================================
+# Mark all tests as unit tests
+# ============================================================================
+
+pytestmark = pytest.mark.unit

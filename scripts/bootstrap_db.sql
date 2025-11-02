@@ -34,7 +34,7 @@ CREATE INDEX IF NOT EXISTS idx_raw_job_postings_payload_gin ON raw.job_postings_
 -- Grant permissions on the table
 GRANT ALL PRIVILEGES ON TABLE raw.job_postings_raw TO job_etl_user;
 
--- Create a placeholder staging table (will be replaced by dbt models)
+-- Create staging table populated by the Python normalizer service
 CREATE TABLE IF NOT EXISTS staging.job_postings_stg (
     provider_job_id TEXT,
     job_link TEXT,
@@ -66,7 +66,7 @@ CREATE INDEX IF NOT EXISTS idx_staging_job_postings_posted_at ON staging.job_pos
 -- Grant permissions on staging table
 GRANT ALL PRIVILEGES ON TABLE staging.job_postings_stg TO job_etl_user;
 
--- Create placeholder marts tables (will be replaced by dbt models)
+-- Create marts tables (populated by dbt models during the dbt_models_core task)
 CREATE TABLE IF NOT EXISTS marts.dim_companies (
     company_id SERIAL PRIMARY KEY,
     company TEXT NOT NULL,

@@ -280,3 +280,8 @@ class TestMockAdapter:
         jobs, _ = adapter.fetch()
         assert len(jobs) > 0
 
+# ============================================================================
+# Mark all tests as unit tests
+# ============================================================================
+
+pytestmark = pytest.mark.unit

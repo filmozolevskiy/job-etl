@@ -1,0 +1,12 @@
+# Normalizer Service Dependencies
+# Python 3.9+
+
+# Database connection
+psycopg2-binary==2.9.9
+
+# Environment variable management
+python-dotenv==1.0.0
+
+# Type hints support (for Python 3.9)
+typing-extensions==4.8.0
+

@@ -49,21 +49,26 @@
   * **AC:** Can ingest ≥20 jobs on demand (adjusted for API limit); raw JSON stored to `raw.job_postings_raw` with `collected_at`, `source`.
   * **Implementation:** JSearch API (OpenWebNinja) adapter with retry logic, pagination, and comprehensive tests.
 
-* [ ] **Airflow DAG skeleton (`jobs_etl_daily`)**
+* [x] **Airflow DAG skeleton (`jobs_etl_daily`)**
 
-  * **AC:** DAG contains tasks: `start → extract_{source} → load_raw_to_staging → normalize → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
+  * **AC:** DAG contains tasks: `start → extract_{source} → normalize → enrich → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
 
-* [ ] **Normalizer service**
+* [x] **Normalizer service**
 
   * **AC:** Converts provider JSON to canonical rows; writes to `staging.job_postings_stg`; idempotent re-runs (no dup rows for same hash).
 
-* [ ] **dbt core models (staging → marts)**
+* [x] **Airflow integration: wire `source-extractor` into DAG**
+
+  * **AC:** `extract_jsearch` calls source-extractor (PythonOperator/DockerOperator), uses Airflow Connection/Variables for creds, ingests to `raw.job_postings_raw`, returns extracted count via XCom.
+
+* [x] **dbt core models (staging → marts)**
 
   * **AC:** Models for `int_*/marts` compile; `hash_key` derivation present; `unique`/`not_null` tests defined on `hash_key`.
 
-* [ ] **Deduplication logic (upsert)**
+* [x] **Deduplication logic (upsert)**
 
   * **AC:** `hash_key = md5(normalized company|title|location)`; re-runs update `last_seen_at`, preserve `first_seen_at`.
+  * **Note:** Implemented in Python normalizer service
 
 * [ ] **Minimal ranker (stub scoring)**
 

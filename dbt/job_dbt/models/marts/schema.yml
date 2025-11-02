@@ -1,0 +1,112 @@
+version: 2
+
+models:
+  - name: dim_companies
+    description: "Company dimension table with surrogate key"
+    columns:
+      - name: company_id
+        description: "Surrogate key for company (hash of normalized name)"
+        tests:
+          - unique
+          - not_null
+      
+      - name: company
+        description: "Company name"
+        tests:
+          - not_null
+      
+      - name: company_size
+        description: "Company size bucket"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001+', 'unknown']
+      
+      - name: source_first_seen
+        description: "First source where this company was observed"
+      
+      - name: created_at
+        description: "When this company was first seen"
+        tests:
+          - not_null
+  
+  - name: fact_jobs
+    description: "Job postings fact table with rankings"
+    columns:
+      - name: hash_key
+        description: "Primary key for job deduplication (md5 of company|title|location)"
+        tests:
+          - unique
+          - not_null
+      
+      - name: job_title_std
+        description: "Standardized job title (will be enriched)"
+        tests:
+          - not_null
+      
+      - name: company_id
+        description: "Foreign key to dim_companies"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_companies')
+              field: company_id
+      
+      - name: location_std
+        description: "Standardized location (will be enriched)"
+        tests:
+          - not_null
+      
+      - name: remote_type
+        description: "Remote work arrangement type"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['remote', 'hybrid', 'onsite', 'unknown']
+      
+      - name: contract_type
+        description: "Employment contract type"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['full_time', 'part_time', 'contract', 'intern', 'temp', 'unknown']
+      
+      - name: salary_min_norm
+        description: "Normalized minimum salary"
+      
+      - name: salary_max_norm
+        description: "Normalized maximum salary"
+      
+      - name: salary_currency_norm
+        description: "Normalized salary currency (e.g., CAD)"
+      
+      - name: skills
+        description: "Array of extracted skills"
+      
+      - name: posted_at
+        description: "Job posting timestamp from provider"
+      
+      - name: source
+        description: "Data source"
+        tests:
+          - not_null
+      
+      - name: ingested_at
+        description: "When job was first ingested"
+        tests:
+          - not_null
+      
+      - name: last_seen_at
+        description: "When job was last seen"
+        tests:
+          - not_null
+      
+      - name: apply_url
+        description: "URL to apply for the job"
+      
+      - name: rank_score
+        description: "Ranking score (0-100) computed by ranker service"
+      
+      - name: rank_explain
+        description: "JSON explaining rank_score breakdown by features"
+
