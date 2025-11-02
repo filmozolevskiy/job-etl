@@ -53,18 +53,18 @@ default_args = {
 def run_dbt_models(models: str, **context):
     """
     Run dbt models with the specified selection.
-    
+
     Args:
         models: Model selection string (e.g., "stg_*", "dim_* fact_*")
     """
     import os
     import subprocess
     from airflow.hooks.base import BaseHook
-    
+
     print("=" * 60)
     print(f"DBT TASK - Running models: {models}")
     print("=" * 60)
-    
+
     try:
         # Get database credentials from Airflow connection
         try:
@@ -82,18 +82,18 @@ def run_dbt_models(models: str, **context):
             db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
             db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
             db_name = os.getenv('POSTGRES_DB', 'job_etl')
-        
+
         # Set up dbt environment
         project_dir = '/opt/airflow/dbt/job_dbt'
         profiles_dir = '/tmp/dbt_profiles'
         target_path = '/tmp/dbt_target'
         log_path = '/tmp/dbt_logs'
-        
+
         # Create temporary directories
         os.makedirs(profiles_dir, exist_ok=True)
         os.makedirs(target_path, exist_ok=True)
         os.makedirs(log_path, exist_ok=True)
-        
+
         # Create profiles.yml
         profiles_yml = f"""job_dbt:
   target: docker
@@ -113,7 +113,7 @@ def run_dbt_models(models: str, **context):
 """
         with open(f'{profiles_dir}/profiles.yml', 'w') as f:
             f.write(profiles_yml)
-        
+
         # Run dbt command
         cmd = [
             'dbt',
@@ -124,7 +124,7 @@ def run_dbt_models(models: str, **context):
             '--target-path', target_path,
             '--log-path', log_path
         ]
-        
+
         print(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
@@ -132,20 +132,20 @@ def run_dbt_models(models: str, **context):
             text=True,
             check=False
         )
-        
+
         print(result.stdout)
         if result.stderr:
             print("STDERR:", result.stderr)
-        
+
         if result.returncode != 0:
             raise subprocess.CalledProcessError(result.returncode, cmd)
-        
+
         print("=" * 60)
         print(f"DBT TASK - Successfully ran models: {models}")
         print("=" * 60)
-        
+
         return {"models_run": models, "status": "success"}
-        
+
     except subprocess.CalledProcessError as e:
         print("=" * 60)
         print(f"DBT TASK - Failed with return code {e.returncode}")
