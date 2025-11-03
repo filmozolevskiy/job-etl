@@ -1,0 +1,26 @@
+# Ranking Configuration
+# Weights and profile preferences for job ranking algorithm
+
+weights:
+  title_keywords: 0.25
+  skills_overlap: 0.30
+  location_proximity: 0.10
+  salary_band: 0.15
+  employment_type: 0.05
+  seniority_match: 0.07
+  remote_type: 0.04
+  company_size: 0.04
+
+profile:
+  title_keywords: ["data engineer", "analytics engineer", "etl", "airflow", "dbt"]
+  must_have_skills: ["sql", "python", "looker"]
+  nice_to_have_skills: ["airflow", "dbt", "aws", "docker"]
+  location_home: "Montreal, QC, CA"
+  location_radius_km: 50
+  salary_target_cad:
+    min: 70000
+    max: 120000
+  preferred_remote: ["remote", "hybrid"]
+  preferred_contracts: ["full_time"]
+  seniority: ["junior", "intermediate"]
+  preferred_company_sizes: ["201-500", "501-1000"]
