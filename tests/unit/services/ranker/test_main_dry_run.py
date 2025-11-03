@@ -1,5 +1,3 @@
-import types
-
 from services.ranker.config_loader import RankingConfig, RankingWeights, UserProfile, SalaryTarget
 from services.ranker.main import run_ranker
 
