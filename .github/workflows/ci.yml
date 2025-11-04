@@ -109,7 +109,7 @@ jobs:
           # Install database dependencies
           pip install psycopg2-binary sqlalchemy
           # Install service dependencies
-          pip install requests pydantic python-dotenv
+          pip install requests pydantic python-dotenv pyyaml
       
       # Step 3b: Initialize database tables with retry logic
       - name: Bootstrap database
