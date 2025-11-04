@@ -135,6 +135,10 @@
 
   * **AC:** Workbook page with filters (location, remote_type, salary range); top N list; fields clickable (Apply URL).
 
+* [ ] **Publish to Tableau Server/Cloud (optional)**
+
+  * **AC:** After local `.hyper` creation, publish to Tableau Server/Cloud using credentials; configurable via env/variables; errors logged and do not block local export.
+
 ---
 
 ## Phase 2 — AWS Lift (harder)
