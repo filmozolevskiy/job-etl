@@ -145,7 +145,7 @@ def load_ranking_config(config_path: Optional[str] = None) -> RankingConfig:
     logger.info("Loading ranking configuration", extra={'config_path': config_path})
 
     try:
-        with open(config_path, 'r') as f:
+        with open(config_path) as f:
             config_dict = yaml.safe_load(f)
 
         if not config_dict:
@@ -174,7 +174,7 @@ def load_ranking_config(config_path: Optional[str] = None) -> RankingConfig:
 
         return config
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logger.error(f"Configuration file not found: {config_path}")
         raise
     except yaml.YAMLError as e:

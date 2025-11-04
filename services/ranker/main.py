@@ -186,7 +186,7 @@ def run_ranker(
         except Exception as e:
             stats['failed'] += 1
             logger.warning(
-                f"Failed to rank job",
+                "Failed to rank job",
                 extra={
                     'error': str(e),
                     'hash_key': job.get('hash_key'),
@@ -269,7 +269,7 @@ def main() -> int:
         # Show overall stats
         if not args.dry_run:
             overall_stats = db.get_ranking_stats()
-            print(f"\nOverall Statistics:")
+            print("\nOverall Statistics:")
             print(f"  Total jobs:     {overall_stats['total_jobs']}")
             print(f"  Ranked jobs:    {overall_stats['ranked_jobs']}")
             print(f"  Unranked jobs:  {overall_stats['unranked_jobs']}")

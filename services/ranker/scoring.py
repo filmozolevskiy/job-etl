@@ -5,7 +5,6 @@ This module contains the core ranking logic that calculates job scores based on
 configurable weights and user profile preferences.
 """
 
-import json
 import logging
 from typing import Any, Optional
 

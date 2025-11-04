@@ -1,6 +1,3 @@
-import math
-import pytest
-
 from services.ranker.config_loader import RankingConfig, RankingWeights, UserProfile, SalaryTarget
 from services.ranker.scoring import calculate_rank
 
