@@ -70,9 +70,10 @@
   * **AC:** `hash_key = md5(normalized company|title|location)`; re-runs update `last_seen_at`, preserve `first_seen_at`.
   * **Note:** Implemented in Python normalizer service
 
-* [ ] **Minimal ranker (stub scoring)**
+* [x] **Minimal ranker (stub scoring)**
 
   * **AC:** Writes `rank_score` (e.g., title/skill keyword hits only) and `rank_explain` JSON to `marts.fact_jobs`.
+  * **Implementation:** Full ranker service with configurable weights, scoring algorithm, database operations, and Airflow integration. Includes tests and CI fixes.
 
 * [ ] **Publisher: Tableau Hyper export**
 
