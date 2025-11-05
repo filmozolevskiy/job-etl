@@ -6,7 +6,7 @@ import argparse
 import logging
 import sys
 
-from .exporter import export_from_env
+from services.publisher_hyper.exporter import export_from_env
 
 
 logging.basicConfig(
