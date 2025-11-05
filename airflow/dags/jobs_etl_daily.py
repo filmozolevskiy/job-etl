@@ -548,22 +548,264 @@ def send_webhook_notification(**context):
     """
     Send daily summary to configured webhook (Slack/Discord).
 
-    For now, this is a no-op placeholder. In the next phase, this will:
-    - Collect counts from XCom (extracted, staged, ranked)
-    - Read webhook URL from Airflow Variables/Connections
-    - Format summary JSON with top matches
-    - POST to webhook endpoint
+    This function:
+    - Collects counts from XCom (extracted, staged, ranked)
+    - Queries database for top ranked jobs
+    - Reads webhook URL from Airflow Variables/environment
+    - Formats summary JSON with top matches and failures
+    - POSTs to webhook endpoint
     """
+    import os
+    import sys
+    import json
+    import requests
+    from datetime import datetime
+    from typing import Optional
+    from airflow.hooks.base import BaseHook
+    from airflow.models import TaskInstance
+
+    # Add project root to path so we can import services
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     print("=" * 60)
-    print("WEBHOOK NOTIFICATION TASK")
-    print("=" * 60)
-    print("TODO: Implement webhook notification")
-    print("  - Collect counts from upstream tasks")
-    print("  - Format summary with top matches")
-    print("  - POST to configured webhook URL")
+    print("WEBHOOK NOTIFICATION TASK - Starting")
     print("=" * 60)
 
-    return {"notification_sent": False}
+    try:
+        # Get task instance and DAG run from context
+        ti: TaskInstance = context['ti']
+        dag_run = context['dag_run']
+        
+        # Calculate duration
+        start_time = dag_run.start_date
+        end_time = datetime.now(dag_run.start_date.tzinfo) if dag_run.start_date else datetime.now()
+        duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
+
+        # Determine overall status
+        dag_state = dag_run.state
+        is_success = dag_state == 'success'
+        
+        # Collect counts from XCom
+        extract_result = ti.xcom_pull(task_ids='extract_jsearch', default={})
+        normalize_result = ti.xcom_pull(task_ids='normalize', default={})
+        enrich_result = ti.xcom_pull(task_ids='enrich', default={})
+        rank_result = ti.xcom_pull(task_ids='rank', default={})
+
+        extracted_count = extract_result.get('extracted_count', 0)
+        normalized_count = normalize_result.get('normalized_count', 0)
+        upserted_count = normalize_result.get('upserted_count', 0)
+        enriched_count = enrich_result.get('enriched_count', 0)
+        ranked_count = rank_result.get('ranked_count', 0)
+
+        # Get database connection for queries
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                print("Warning: DATABASE_URL not configured, skipping database queries")
+                database_url = None
+
+        # Query top ranked jobs and get counts
+        top_matches = []
+        deduped_unique_count = 0
+        total_ranked = 0
+
+        if database_url:
+            try:
+                import psycopg2
+                import psycopg2.extras
+
+                with psycopg2.connect(database_url) as conn:
+                    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                        # Get total unique jobs (deduped)
+                        cur.execute("""
+                            SELECT COUNT(DISTINCT hash_key) as count
+                            FROM marts.fact_jobs
+                        """)
+                        deduped_unique_count = cur.fetchone()['count'] or 0
+
+                        # Get total ranked jobs
+                        cur.execute("""
+                            SELECT COUNT(*) as count
+                            FROM marts.fact_jobs
+                            WHERE rank_score IS NOT NULL
+                        """)
+                        total_ranked = cur.fetchone()['count'] or 0
+
+                        # Get top 25 ranked jobs from this run
+                        # Filter for jobs ingested since the DAG execution date
+                        # This ensures we only show new matches from the current run
+                        execution_date = dag_run.execution_date
+                        if execution_date:
+                            # Filter for jobs ingested since the execution date (start of this run)
+                            # Use a small buffer (1 hour before) to account for any timing edge cases
+                            filter_time = execution_date - timedelta(hours=1)
+                            print(f"Filtering top matches for jobs ingested since: {filter_time}")
+                            cur.execute("""
+                                SELECT 
+                                    f.job_title_std as title,
+                                    d.company,
+                                    f.location_std as location,
+                                    f.rank_score as score,
+                                    f.apply_url
+                                FROM marts.fact_jobs f
+                                LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                WHERE f.rank_score IS NOT NULL
+                                  AND f.ingested_at >= %s
+                                ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                LIMIT 25
+                            """, (filter_time,))
+                        else:
+                            # Fallback: if no execution_date, use last 24 hours from start_date
+                            if dag_run.start_date:
+                                filter_time = dag_run.start_date - timedelta(hours=24)
+                                print(f"Using fallback: filtering top matches for jobs ingested since: {filter_time} (24h before start_date)")
+                                cur.execute("""
+                                    SELECT 
+                                        f.job_title_std as title,
+                                        d.company,
+                                        f.location_std as location,
+                                        f.rank_score as score,
+                                        f.apply_url
+                                    FROM marts.fact_jobs f
+                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                    WHERE f.rank_score IS NOT NULL
+                                      AND f.ingested_at >= %s
+                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                    LIMIT 25
+                                """, (filter_time,))
+                            else:
+                                # Last resort: get top 25 without time filter
+                                print("Warning: No execution_date or start_date available, fetching top 25 without time filter")
+                                cur.execute("""
+                                    SELECT 
+                                        f.job_title_std as title,
+                                        d.company,
+                                        f.location_std as location,
+                                        f.rank_score as score,
+                                        f.apply_url
+                                    FROM marts.fact_jobs f
+                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                    WHERE f.rank_score IS NOT NULL
+                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                    LIMIT 25
+                                """)
+                        top_jobs = cur.fetchall()
+
+                        for job in top_jobs:
+                            top_matches.append({
+                                "title": job['title'] or 'Unknown',
+                                "company": job['company'] or 'Unknown',
+                                "location": job['location'] or 'Unknown',
+                                "score": float(job['score']) if job['score'] else 0.0,
+                                "apply_url": job['apply_url'] or ''
+                            })
+
+            except Exception as e:
+                print(f"Warning: Failed to query database for top matches: {e}")
+                print("Continuing with webhook notification without database data")
+
+        # Collect failed tasks
+        failed_tasks = []
+        if not is_success:
+            # Check all tasks in the DAG run
+            for task_instance in dag_run.get_task_instances():
+                if task_instance.state == 'failed':
+                    failed_tasks.append(task_instance.task_id)
+
+        # Build webhook payload
+        payload = {
+            "run_id": dag_run.run_id,
+            "status": "success" if is_success else "failed",
+            "counts": {
+                "extracted": extracted_count,
+                "staged": normalized_count,
+                "deduped_unique": deduped_unique_count,
+                "enriched": enriched_count,
+                "ranked": ranked_count,
+                "top_matches": len(top_matches)
+            },
+            "new_top_matches": top_matches,
+            "failures": failed_tasks,
+            "duration_sec": duration_sec
+        }
+
+        # Get webhook URL from Airflow Variables or environment
+        def _get_webhook_url() -> Optional[str]:
+            try:
+                return Variable.get('WEBHOOK_URL')
+            except Exception:
+                return os.getenv('WEBHOOK_URL')
+
+        webhook_url = _get_webhook_url()
+
+        if not webhook_url:
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Skipped (no webhook URL configured)")
+            print("=" * 60)
+            print("To enable webhook notifications, set WEBHOOK_URL as:")
+            print("  - Airflow Variable: WEBHOOK_URL")
+            print("  - Environment variable: WEBHOOK_URL")
+            print("=" * 60)
+            print(f"Payload that would have been sent:")
+            print(json.dumps(payload, indent=2))
+            print("=" * 60)
+            return {"notification_sent": False, "reason": "no_webhook_url", "payload": payload}
+
+        # Send webhook notification
+        try:
+            print(f"Sending webhook notification to: {webhook_url}")
+            response = requests.post(
+                webhook_url,
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=30  # 30 second timeout
+            )
+            response.raise_for_status()  # Raise exception for bad status codes
+
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Success")
+            print("=" * 60)
+            print(f"Response status: {response.status_code}")
+            print(f"Payload sent: {json.dumps(payload, indent=2)}")
+            print("=" * 60)
+
+            return {
+                "notification_sent": True,
+                "status_code": response.status_code,
+                "payload": payload
+            }
+
+        except requests.exceptions.RequestException as e:
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Failed to send webhook")
+            print("=" * 60)
+            print(f"Error: {e}")
+            print(f"Payload that failed to send:")
+            print(json.dumps(payload, indent=2))
+            print("=" * 60)
+            # Don't raise - we don't want webhook failures to fail the DAG
+            return {
+                "notification_sent": False,
+                "error": str(e),
+                "payload": payload
+            }
+
+    except Exception as e:
+        print("=" * 60)
+        print("WEBHOOK NOTIFICATION TASK - Unexpected Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        # Don't raise - we don't want webhook failures to fail the DAG
+        return {"notification_sent": False, "error": str(e)}
 
 
 # -----------------------------------------------------------------------------
