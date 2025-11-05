@@ -8,7 +8,6 @@ import sys
 
 from services.publisher_hyper.exporter import export_from_env
 
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
