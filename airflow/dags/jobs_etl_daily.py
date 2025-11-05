@@ -163,6 +163,120 @@ def run_core_dbt_models(**context):
     return run_dbt_models(models="dim_* fact_*", **context)
 
 
+def run_dbt_tests(**context):
+    """
+    Run dbt tests to validate data quality.
+
+    Tests include:
+    - Unique constraints on hash_key
+    - Not null on critical fields
+    - Accepted values for enums
+    - Referential integrity (foreign keys)
+    """
+    import os
+    import subprocess
+    from airflow.hooks.base import BaseHook
+
+    print("=" * 60)
+    print("DBT TESTS TASK - Running data quality tests")
+    print("=" * 60)
+
+    try:
+        # Get database credentials from Airflow connection
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            db_host = conn.host
+            db_port = conn.port
+            db_user = conn.login
+            db_password = conn.password
+            db_name = conn.schema  # In Airflow connection, schema is the database name
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            db_host = os.getenv('POSTGRES_HOST', 'postgres')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+            db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
+            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+        # Set up dbt environment
+        project_dir = '/opt/airflow/dbt/job_dbt'
+        profiles_dir = '/tmp/dbt_profiles'
+        target_path = '/tmp/dbt_target'
+        log_path = '/tmp/dbt_logs'
+
+        # Create temporary directories
+        os.makedirs(profiles_dir, exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
+        os.makedirs(log_path, exist_ok=True)
+
+        # Create profiles.yml
+        profiles_yml = f"""job_dbt:
+        target: docker
+        outputs:
+            docker:
+                type: postgres
+                host: {db_host}
+                port: {db_port}
+                user: {db_user}
+                password: '{db_password}'
+                dbname: {db_name}
+                schema: staging
+                threads: 4
+                keepalives_idle: 0
+                connect_timeout: 10
+                search_path: "staging,raw,marts,public"
+"""
+        with open(f'{profiles_dir}/profiles.yml', 'w') as f:
+            f.write(profiles_yml)
+
+        # Run dbt test command
+        cmd = [
+            'dbt',
+            'test',
+            '--project-dir', project_dir,
+            '--profiles-dir', profiles_dir,
+            '--target-path', target_path,
+            '--log-path', log_path
+        ]
+
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        print(result.stdout)
+        if result.stderr:
+            print("STDERR:", result.stderr)
+
+        if result.returncode != 0:
+            print("=" * 60)
+            print("DBT TESTS TASK - Some tests failed")
+            print("=" * 60)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+
+        print("=" * 60)
+        print("DBT TESTS TASK - All tests passed")
+        print("=" * 60)
+
+        return {"tests_status": "passed", "status": "success"}
+
+    except subprocess.CalledProcessError as e:
+        print("=" * 60)
+        print(f"DBT TESTS TASK - Failed with return code {e.returncode}")
+        print("=" * 60)
+        raise
+    except Exception as e:
+        print("=" * 60)
+        print(f"DBT TESTS TASK - Unexpected error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
+
+
 def extract_source_jsearch(**context):
     """
     Extract job postings from JSearch API.
@@ -947,13 +1061,9 @@ with DAG(
     # -------------------------------------------------------------------------
     # Task 9: Run dbt tests
     # -------------------------------------------------------------------------
-    dbt_tests = BashOperator(
+    dbt_tests = PythonOperator(
         task_id="dbt_tests",
-        bash_command="""
-        echo "Running dbt tests..."
-        echo "TODO: cd /opt/airflow/dbt/job_dbt && dbt test"
-        echo "Tests: unique hash_key, not_null, accepted_values, relationships"
-        """,
+        python_callable=run_dbt_tests,
         retries=1,
         doc_md="""
         **dbt: Data quality tests**
