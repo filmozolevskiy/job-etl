@@ -70,9 +70,10 @@
   * **AC:** `hash_key = md5(normalized company|title|location)`; re-runs update `last_seen_at`, preserve `first_seen_at`.
   * **Note:** Implemented in Python normalizer service
 
-* [ ] **Minimal ranker (stub scoring)**
+* [x] **Minimal ranker (stub scoring)**
 
   * **AC:** Writes `rank_score` (e.g., title/skill keyword hits only) and `rank_explain` JSON to `marts.fact_jobs`.
+  * **Implementation:** Full ranker service with configurable weights, scoring algorithm, database operations, and Airflow integration. Includes tests and CI fixes.
 
 * [ ] **Publisher: Tableau Hyper export**
 
@@ -133,6 +134,10 @@
 * [ ] **Tableau workbook: Ranked List + basic filters**
 
   * **AC:** Workbook page with filters (location, remote_type, salary range); top N list; fields clickable (Apply URL).
+
+* [ ] **Publish to Tableau Server/Cloud (optional)**
+
+  * **AC:** After local `.hyper` creation, publish to Tableau Server/Cloud using credentials; configurable via env/variables; errors logged and do not block local export.
 
 ---
 

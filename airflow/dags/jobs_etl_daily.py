@@ -406,23 +406,115 @@ def rank_jobs(**context):
     """
     Rank jobs based on configurable weights and profile.
 
-    For now, this is a no-op placeholder. In the next phase, this will:
-    - Call the ranker service (via DockerOperator)
-    - Read config/ranking.yml for weights
-    - Calculate rank_score (0-100)
-    - Generate rank_explain JSON
-    - Update marts.fact_jobs with scores
+    This function:
+    - Calls the ranker service
+    - Reads config/ranking.yml for weights and profile
+    - Calculates rank_score (0-100) for each job
+    - Generates rank_explain JSON with per-feature subscores
+    - Updates marts.fact_jobs with scores
     """
+    import os
+    import sys
+    from airflow.hooks.base import BaseHook
+
+    # Add project root to path so we can import services
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     print("=" * 60)
-    print("RANK TASK")
-    print("=" * 60)
-    print("TODO: Implement ranking")
-    print("  - Will call ranker service")
-    print("  - Calculate rank_score with explainability")
-    print("  - Update marts.fact_jobs")
+    print("RANK TASK - Starting")
     print("=" * 60)
 
-    return {"ranked_count": 0}
+    try:
+        # Import ranker service
+        from services.ranker.db_operations import RankerDB
+        from services.ranker.config_loader import load_ranking_config
+        from services.ranker.scoring import calculate_rank
+
+        # Get database URL from Airflow connection
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                raise ValueError(
+                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                    "or environment variable 'DATABASE_URL'"
+                ) from None
+
+        print("Loading ranking configuration...")
+        config = load_ranking_config()
+
+        print("Connecting to database...")
+        db = RankerDB(database_url)
+
+        print("Fetching unranked jobs...")
+        jobs = db.fetch_unranked_jobs(limit=None)
+
+        if not jobs:
+            print("No unranked jobs found")
+            return {"ranked_count": 0, "total_count": 0}
+
+        print(f"Found {len(jobs)} jobs to rank")
+
+        # Rank each job
+        rankings = []
+        for i, job in enumerate(jobs, 1):
+            try:
+                rank_score, rank_explain = calculate_rank(job, config)
+                rankings.append({
+                    'hash_key': job['hash_key'],
+                    'rank_score': rank_score,
+                    'rank_explain': rank_explain,
+                })
+
+                if i % 10 == 0 or i == len(jobs):
+                    print(f"  Ranked {i}/{len(jobs)} jobs...")
+
+            except Exception as e:
+                print(f"  Warning: Failed to rank job {job.get('hash_key', 'unknown')}: {e}")
+                continue
+
+        # Update database
+        print(f"Updating database with {len(rankings)} rankings...")
+        updated_count = db.update_jobs_ranking_batch(rankings)
+
+        # Get overall statistics
+        stats = db.get_ranking_stats()
+
+        print("=" * 60)
+        print("RANK TASK - Completed Successfully")
+        print("=" * 60)
+        print("Results:")
+        print(f"  - Total jobs found:   {stats['total_jobs']}")
+        print(f"  - Previously ranked:  {stats['ranked_jobs'] - len(rankings)}")
+        print(f"  - Newly ranked:       {updated_count}")
+        print(f"  - Total ranked:       {stats['ranked_jobs']}")
+        print(f"  - Unranked:           {stats['unranked_jobs']}")
+        if stats['average_score']:
+            print(f"  - Average score:      {stats['average_score']:.2f}")
+            print(f"  - Top score:          {stats['top_score']:.2f}")
+        print("=" * 60)
+
+        return {
+            "ranked_count": updated_count,
+            "total_count": stats['total_jobs'],
+            "average_score": stats['average_score'],
+            "top_score": stats['top_score']
+        }
+
+    except Exception as e:
+        print("=" * 60)
+        print("RANK TASK - Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
 
 
 def publish_to_tableau(**context):
@@ -438,12 +530,18 @@ def publish_to_tableau(**context):
     print("=" * 60)
     print("PUBLISH TASK")
     print("=" * 60)
-    print("TODO: Implement Tableau export")
-    print("  - Will call publisher-hyper service")
-    print("  - Create .hyper files in ./artifacts/")
-    print("=" * 60)
-
-    return {"hyper_file": "artifacts/jobs_ranked_PLACEHOLDER.hyper"}
+    try:
+        # Lazy import to avoid heavy deps unless this task runs
+        from services.publisher_hyper.exporter import export_from_env
+        hyper_path = export_from_env(output_dir="artifacts", hyper_filename="jobs_ranked.hyper")
+        print(f"Created hyper: {hyper_path}")
+        print("=" * 60)
+        return {"hyper_file": hyper_path}
+    except Exception as e:
+        print("Publish failed:", e)
+        print("=" * 60)
+        # Still return a value for downstream tasks
+        return {"hyper_file": None, "error": str(e)}
 
 
 def send_webhook_notification(**context):
