@@ -559,7 +559,7 @@ def send_webhook_notification(**context):
     import sys
     import json
     import requests
-    from datetime import datetime
+    from datetime import datetime, timezone
     from typing import Optional
     from airflow.hooks.base import BaseHook
     from airflow.models import TaskInstance
@@ -577,16 +577,19 @@ def send_webhook_notification(**context):
         # Get task instance and DAG run from context
         ti: TaskInstance = context['ti']
         dag_run = context['dag_run']
-        
+
         # Calculate duration
         start_time = dag_run.start_date
-        end_time = datetime.now(dag_run.start_date.tzinfo) if dag_run.start_date else datetime.now()
+        if start_time and start_time.tzinfo:
+            end_time = datetime.now(start_time.tzinfo)
+        else:
+            end_time = datetime.now(timezone.utc)
         duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
 
         # Determine overall status
         dag_state = dag_run.state
         is_success = dag_state == 'success'
-        
+
         # Collect counts from XCom
         extract_result = ti.xcom_pull(task_ids='extract_jsearch', default={})
         normalize_result = ti.xcom_pull(task_ids='normalize', default={})
@@ -595,7 +598,6 @@ def send_webhook_notification(**context):
 
         extracted_count = extract_result.get('extracted_count', 0)
         normalized_count = normalize_result.get('normalized_count', 0)
-        upserted_count = normalize_result.get('upserted_count', 0)
         enriched_count = enrich_result.get('enriched_count', 0)
         ranked_count = rank_result.get('ranked_count', 0)
 
@@ -630,13 +632,15 @@ def send_webhook_notification(**context):
                         """)
                         deduped_unique_count = cur.fetchone()['count'] or 0
 
-                        # Get total ranked jobs
+                        # Get total ranked jobs (for potential future use)
+                        # Currently not used in payload, but kept for completeness
                         cur.execute("""
                             SELECT COUNT(*) as count
                             FROM marts.fact_jobs
                             WHERE rank_score IS NOT NULL
                         """)
-                        total_ranked = cur.fetchone()['count'] or 0
+                        # Note: total_ranked not used in current payload, but query kept for stats
+                        _ = cur.fetchone()['count'] or 0
 
                         # Get top 25 ranked jobs from this run
                         # Filter for jobs ingested since the DAG execution date
@@ -648,7 +652,7 @@ def send_webhook_notification(**context):
                             filter_time = execution_date - timedelta(hours=1)
                             print(f"Filtering top matches for jobs ingested since: {filter_time}")
                             cur.execute("""
-                                SELECT 
+                                SELECT
                                     f.job_title_std as title,
                                     d.company,
                                     f.location_std as location,
@@ -667,7 +671,7 @@ def send_webhook_notification(**context):
                                 filter_time = dag_run.start_date - timedelta(hours=24)
                                 print(f"Using fallback: filtering top matches for jobs ingested since: {filter_time} (24h before start_date)")
                                 cur.execute("""
-                                    SELECT 
+                                    SELECT
                                         f.job_title_std as title,
                                         d.company,
                                         f.location_std as location,
@@ -684,7 +688,7 @@ def send_webhook_notification(**context):
                                 # Last resort: get top 25 without time filter
                                 print("Warning: No execution_date or start_date available, fetching top 25 without time filter")
                                 cur.execute("""
-                                    SELECT 
+                                    SELECT
                                         f.job_title_std as title,
                                         d.company,
                                         f.location_std as location,
@@ -753,7 +757,7 @@ def send_webhook_notification(**context):
             print("  - Airflow Variable: WEBHOOK_URL")
             print("  - Environment variable: WEBHOOK_URL")
             print("=" * 60)
-            print(f"Payload that would have been sent:")
+            print("Payload that would have been sent:")
             print(json.dumps(payload, indent=2))
             print("=" * 60)
             return {"notification_sent": False, "reason": "no_webhook_url", "payload": payload}
@@ -787,7 +791,7 @@ def send_webhook_notification(**context):
             print("WEBHOOK NOTIFICATION TASK - Failed to send webhook")
             print("=" * 60)
             print(f"Error: {e}")
-            print(f"Payload that failed to send:")
+            print("Payload that failed to send:")
             print(json.dumps(payload, indent=2))
             print("=" * 60)
             # Don't raise - we don't want webhook failures to fail the DAG
