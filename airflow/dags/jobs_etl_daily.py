@@ -616,7 +616,6 @@ def send_webhook_notification(**context):
         # Query top ranked jobs and get counts
         top_matches = []
         deduped_unique_count = 0
-        total_ranked = 0
 
         if database_url:
             try:
