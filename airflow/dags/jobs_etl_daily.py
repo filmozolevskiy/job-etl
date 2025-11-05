@@ -163,6 +163,120 @@ def run_core_dbt_models(**context):
     return run_dbt_models(models="dim_* fact_*", **context)
 
 
+def run_dbt_tests(**context):
+    """
+    Run dbt tests to validate data quality.
+
+    Tests include:
+    - Unique constraints on hash_key
+    - Not null on critical fields
+    - Accepted values for enums
+    - Referential integrity (foreign keys)
+    """
+    import os
+    import subprocess
+    from airflow.hooks.base import BaseHook
+
+    print("=" * 60)
+    print("DBT TESTS TASK - Running data quality tests")
+    print("=" * 60)
+
+    try:
+        # Get database credentials from Airflow connection
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            db_host = conn.host
+            db_port = conn.port
+            db_user = conn.login
+            db_password = conn.password
+            db_name = conn.schema  # In Airflow connection, schema is the database name
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            db_host = os.getenv('POSTGRES_HOST', 'postgres')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+            db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
+            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+        # Set up dbt environment
+        project_dir = '/opt/airflow/dbt/job_dbt'
+        profiles_dir = '/tmp/dbt_profiles'
+        target_path = '/tmp/dbt_target'
+        log_path = '/tmp/dbt_logs'
+
+        # Create temporary directories
+        os.makedirs(profiles_dir, exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
+        os.makedirs(log_path, exist_ok=True)
+
+        # Create profiles.yml
+        profiles_yml = f"""job_dbt:
+        target: docker
+        outputs:
+            docker:
+                type: postgres
+                host: {db_host}
+                port: {db_port}
+                user: {db_user}
+                password: '{db_password}'
+                dbname: {db_name}
+                schema: staging
+                threads: 4
+                keepalives_idle: 0
+                connect_timeout: 10
+                search_path: "staging,raw,marts,public"
+"""
+        with open(f'{profiles_dir}/profiles.yml', 'w') as f:
+            f.write(profiles_yml)
+
+        # Run dbt test command
+        cmd = [
+            'dbt',
+            'test',
+            '--project-dir', project_dir,
+            '--profiles-dir', profiles_dir,
+            '--target-path', target_path,
+            '--log-path', log_path
+        ]
+
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        print(result.stdout)
+        if result.stderr:
+            print("STDERR:", result.stderr)
+
+        if result.returncode != 0:
+            print("=" * 60)
+            print("DBT TESTS TASK - Some tests failed")
+            print("=" * 60)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+
+        print("=" * 60)
+        print("DBT TESTS TASK - All tests passed")
+        print("=" * 60)
+
+        return {"tests_status": "passed", "status": "success"}
+
+    except subprocess.CalledProcessError as e:
+        print("=" * 60)
+        print(f"DBT TESTS TASK - Failed with return code {e.returncode}")
+        print("=" * 60)
+        raise
+    except Exception as e:
+        print("=" * 60)
+        print(f"DBT TESTS TASK - Unexpected error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
+
+
 def extract_source_jsearch(**context):
     """
     Extract job postings from JSearch API.
@@ -548,22 +662,267 @@ def send_webhook_notification(**context):
     """
     Send daily summary to configured webhook (Slack/Discord).
 
-    For now, this is a no-op placeholder. In the next phase, this will:
-    - Collect counts from XCom (extracted, staged, ranked)
-    - Read webhook URL from Airflow Variables/Connections
-    - Format summary JSON with top matches
-    - POST to webhook endpoint
+    This function:
+    - Collects counts from XCom (extracted, staged, ranked)
+    - Queries database for top ranked jobs
+    - Reads webhook URL from Airflow Variables/environment
+    - Formats summary JSON with top matches and failures
+    - POSTs to webhook endpoint
     """
+    import os
+    import sys
+    import json
+    import requests
+    from datetime import datetime, timezone
+    from typing import Optional
+    from airflow.hooks.base import BaseHook
+    from airflow.models import TaskInstance
+
+    # Add project root to path so we can import services
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     print("=" * 60)
-    print("WEBHOOK NOTIFICATION TASK")
-    print("=" * 60)
-    print("TODO: Implement webhook notification")
-    print("  - Collect counts from upstream tasks")
-    print("  - Format summary with top matches")
-    print("  - POST to configured webhook URL")
+    print("WEBHOOK NOTIFICATION TASK - Starting")
     print("=" * 60)
 
-    return {"notification_sent": False}
+    try:
+        # Get task instance and DAG run from context
+        ti: TaskInstance = context['ti']
+        dag_run = context['dag_run']
+
+        # Calculate duration
+        start_time = dag_run.start_date
+        if start_time and start_time.tzinfo:
+            end_time = datetime.now(start_time.tzinfo)
+        else:
+            end_time = datetime.now(timezone.utc)
+        duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
+
+        # Determine overall status
+        dag_state = dag_run.state
+        is_success = dag_state == 'success'
+
+        # Collect counts from XCom
+        extract_result = ti.xcom_pull(task_ids='extract_jsearch', default={})
+        normalize_result = ti.xcom_pull(task_ids='normalize', default={})
+        enrich_result = ti.xcom_pull(task_ids='enrich', default={})
+        rank_result = ti.xcom_pull(task_ids='rank', default={})
+
+        extracted_count = extract_result.get('extracted_count', 0)
+        normalized_count = normalize_result.get('normalized_count', 0)
+        enriched_count = enrich_result.get('enriched_count', 0)
+        ranked_count = rank_result.get('ranked_count', 0)
+
+        # Get database connection for queries
+        try:
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                print("Warning: DATABASE_URL not configured, skipping database queries")
+                database_url = None
+
+        # Query top ranked jobs and get counts
+        top_matches = []
+        deduped_unique_count = 0
+
+        if database_url:
+            try:
+                import psycopg2
+                import psycopg2.extras
+
+                with psycopg2.connect(database_url) as conn:
+                    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                        # Get total unique jobs (deduped)
+                        cur.execute("""
+                            SELECT COUNT(DISTINCT hash_key) as count
+                            FROM marts.fact_jobs
+                        """)
+                        deduped_unique_count = cur.fetchone()['count'] or 0
+
+                        # Get total ranked jobs (for potential future use)
+                        # Currently not used in payload, but kept for completeness
+                        cur.execute("""
+                            SELECT COUNT(*) as count
+                            FROM marts.fact_jobs
+                            WHERE rank_score IS NOT NULL
+                        """)
+                        # Note: total_ranked not used in current payload, but query kept for stats
+                        _ = cur.fetchone()['count'] or 0
+
+                        # Get top 25 ranked jobs from this run
+                        # Filter for jobs ingested since the DAG execution date
+                        # This ensures we only show new matches from the current run
+                        execution_date = dag_run.execution_date
+                        if execution_date:
+                            # Filter for jobs ingested since the execution date (start of this run)
+                            # Use a small buffer (1 hour before) to account for any timing edge cases
+                            filter_time = execution_date - timedelta(hours=1)
+                            print(f"Filtering top matches for jobs ingested since: {filter_time}")
+                            cur.execute("""
+                                SELECT
+                                    f.job_title_std as title,
+                                    d.company,
+                                    f.location_std as location,
+                                    f.rank_score as score,
+                                    f.apply_url
+                                FROM marts.fact_jobs f
+                                LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                WHERE f.rank_score IS NOT NULL
+                                  AND f.ingested_at >= %s
+                                ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                LIMIT 25
+                            """, (filter_time,))
+                        else:
+                            # Fallback: if no execution_date, use last 24 hours from start_date
+                            if dag_run.start_date:
+                                filter_time = dag_run.start_date - timedelta(hours=24)
+                                print(f"Using fallback: filtering top matches for jobs ingested since: {filter_time} (24h before start_date)")
+                                cur.execute("""
+                                    SELECT
+                                        f.job_title_std as title,
+                                        d.company,
+                                        f.location_std as location,
+                                        f.rank_score as score,
+                                        f.apply_url
+                                    FROM marts.fact_jobs f
+                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                    WHERE f.rank_score IS NOT NULL
+                                      AND f.ingested_at >= %s
+                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                    LIMIT 25
+                                """, (filter_time,))
+                            else:
+                                # Last resort: get top 25 without time filter
+                                print("Warning: No execution_date or start_date available, fetching top 25 without time filter")
+                                cur.execute("""
+                                    SELECT
+                                        f.job_title_std as title,
+                                        d.company,
+                                        f.location_std as location,
+                                        f.rank_score as score,
+                                        f.apply_url
+                                    FROM marts.fact_jobs f
+                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                    WHERE f.rank_score IS NOT NULL
+                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                    LIMIT 25
+                                """)
+                        top_jobs = cur.fetchall()
+
+                        for job in top_jobs:
+                            top_matches.append({
+                                "title": job['title'] or 'Unknown',
+                                "company": job['company'] or 'Unknown',
+                                "location": job['location'] or 'Unknown',
+                                "score": float(job['score']) if job['score'] else 0.0,
+                                "apply_url": job['apply_url'] or ''
+                            })
+
+            except Exception as e:
+                print(f"Warning: Failed to query database for top matches: {e}")
+                print("Continuing with webhook notification without database data")
+
+        # Collect failed tasks
+        failed_tasks = []
+        if not is_success:
+            # Check all tasks in the DAG run
+            for task_instance in dag_run.get_task_instances():
+                if task_instance.state == 'failed':
+                    failed_tasks.append(task_instance.task_id)
+
+        # Build webhook payload
+        payload = {
+            "run_id": dag_run.run_id,
+            "status": "success" if is_success else "failed",
+            "counts": {
+                "extracted": extracted_count,
+                "staged": normalized_count,
+                "deduped_unique": deduped_unique_count,
+                "enriched": enriched_count,
+                "ranked": ranked_count,
+                "top_matches": len(top_matches)
+            },
+            "new_top_matches": top_matches,
+            "failures": failed_tasks,
+            "duration_sec": duration_sec
+        }
+
+        # Get webhook URL from Airflow Variables or environment
+        def _get_webhook_url() -> Optional[str]:
+            try:
+                return Variable.get('WEBHOOK_URL')
+            except Exception:
+                return os.getenv('WEBHOOK_URL')
+
+        webhook_url = _get_webhook_url()
+
+        if not webhook_url:
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Skipped (no webhook URL configured)")
+            print("=" * 60)
+            print("To enable webhook notifications, set WEBHOOK_URL as:")
+            print("  - Airflow Variable: WEBHOOK_URL")
+            print("  - Environment variable: WEBHOOK_URL")
+            print("=" * 60)
+            print("Payload that would have been sent:")
+            print(json.dumps(payload, indent=2))
+            print("=" * 60)
+            return {"notification_sent": False, "reason": "no_webhook_url", "payload": payload}
+
+        # Send webhook notification
+        try:
+            print(f"Sending webhook notification to: {webhook_url}")
+            response = requests.post(
+                webhook_url,
+                json=payload,
+                headers={'Content-Type': 'application/json'},
+                timeout=30  # 30 second timeout
+            )
+            response.raise_for_status()  # Raise exception for bad status codes
+
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Success")
+            print("=" * 60)
+            print(f"Response status: {response.status_code}")
+            print(f"Payload sent: {json.dumps(payload, indent=2)}")
+            print("=" * 60)
+
+            return {
+                "notification_sent": True,
+                "status_code": response.status_code,
+                "payload": payload
+            }
+
+        except requests.exceptions.RequestException as e:
+            print("=" * 60)
+            print("WEBHOOK NOTIFICATION TASK - Failed to send webhook")
+            print("=" * 60)
+            print(f"Error: {e}")
+            print("Payload that failed to send:")
+            print(json.dumps(payload, indent=2))
+            print("=" * 60)
+            # Don't raise - we don't want webhook failures to fail the DAG
+            return {
+                "notification_sent": False,
+                "error": str(e),
+                "payload": payload
+            }
+
+    except Exception as e:
+        print("=" * 60)
+        print("WEBHOOK NOTIFICATION TASK - Unexpected Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        # Don't raise - we don't want webhook failures to fail the DAG
+        return {"notification_sent": False, "error": str(e)}
 
 
 # -----------------------------------------------------------------------------
@@ -702,13 +1061,9 @@ with DAG(
     # -------------------------------------------------------------------------
     # Task 9: Run dbt tests
     # -------------------------------------------------------------------------
-    dbt_tests = BashOperator(
+    dbt_tests = PythonOperator(
         task_id="dbt_tests",
-        bash_command="""
-        echo "Running dbt tests..."
-        echo "TODO: cd /opt/airflow/dbt/job_dbt && dbt test"
-        echo "Tests: unique hash_key, not_null, accepted_values, relationships"
-        """,
+        python_callable=run_dbt_tests,
         retries=1,
         doc_md="""
         **dbt: Data quality tests**
