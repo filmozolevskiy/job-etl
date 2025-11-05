@@ -530,12 +530,18 @@ def publish_to_tableau(**context):
     print("=" * 60)
     print("PUBLISH TASK")
     print("=" * 60)
-    print("TODO: Implement Tableau export")
-    print("  - Will call publisher-hyper service")
-    print("  - Create .hyper files in ./artifacts/")
-    print("=" * 60)
-
-    return {"hyper_file": "artifacts/jobs_ranked_PLACEHOLDER.hyper"}
+    try:
+        # Lazy import to avoid heavy deps unless this task runs
+        from services.publisher_hyper.exporter import export_from_env
+        hyper_path = export_from_env(output_dir="artifacts", hyper_filename="jobs_ranked.hyper")
+        print(f"Created hyper: {hyper_path}")
+        print("=" * 60)
+        return {"hyper_file": hyper_path}
+    except Exception as e:
+        print("Publish failed:", e)
+        print("=" * 60)
+        # Still return a value for downstream tasks
+        return {"hyper_file": None, "error": str(e)}
 
 
 def send_webhook_notification(**context):
