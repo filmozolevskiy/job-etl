@@ -20,13 +20,13 @@ def export_tables_to_hyper(
     """
     try:
         from tableauhyperapi import (
-            HyperProcess,
-            Telemetry,
             Connection,
             CreateMode,
+            HyperProcess,
+            SqlType,
             TableDefinition,
             TableName,
-            SqlType,
+            Telemetry,
         )
     except Exception as err:  # pragma: no cover
         raise RuntimeError(
