@@ -103,8 +103,27 @@ def run_dbt_models(models: str, **context):
             db_host = os.getenv('POSTGRES_HOST', 'postgres')
             db_port = os.getenv('POSTGRES_PORT', '5432')
             db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-            db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
+            db_password = os.getenv('POSTGRES_PASSWORD')
             db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+            # Try to read password from secret file if available
+            if not db_password:
+                secret_path = '/run/secrets/postgres_password'
+                if os.path.exists(secret_path):
+                    try:
+                        # Try UTF-8 first, then UTF-16 if that fails
+                        with open(secret_path, encoding='utf-8') as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        # Fallback to UTF-16 (Windows might create files in UTF-16)
+                        with open(secret_path, encoding='utf-16') as f:
+                            db_password = f.read().strip()
+
+            if not db_password:
+                raise ValueError(
+                    "Database password must be configured via Airflow connection 'postgres_default', "
+                    "POSTGRES_PASSWORD environment variable, or /run/secrets/postgres_password file"
+                ) from None
 
         # Set up dbt environment
         project_dir = '/opt/airflow/dbt/job_dbt'
@@ -220,8 +239,27 @@ def run_dbt_tests(**context):
             db_host = os.getenv('POSTGRES_HOST', 'postgres')
             db_port = os.getenv('POSTGRES_PORT', '5432')
             db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-            db_password = os.getenv('POSTGRES_PASSWORD', 'secure_postgres_password_123')
+            db_password = os.getenv('POSTGRES_PASSWORD')
             db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+            # Try to read password from secret file if available
+            if not db_password:
+                secret_path = '/run/secrets/postgres_password'
+                if os.path.exists(secret_path):
+                    try:
+                        # Try UTF-8 first, then UTF-16 if that fails
+                        with open(secret_path, encoding='utf-8') as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        # Fallback to UTF-16 (Windows might create files in UTF-16)
+                        with open(secret_path, encoding='utf-16') as f:
+                            db_password = f.read().strip()
+
+            if not db_password:
+                raise ValueError(
+                    "Database password must be configured via Airflow connection 'postgres_default', "
+                    "POSTGRES_PASSWORD environment variable, or /run/secrets/postgres_password file"
+                ) from None
 
         # Set up dbt environment
         project_dir = '/opt/airflow/dbt/job_dbt'
