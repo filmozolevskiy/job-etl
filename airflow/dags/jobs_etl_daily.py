@@ -787,9 +787,9 @@ def send_webhook_notification(**context):
         # Calculate duration
         start_time = dag_run.start_date
         if start_time and start_time.tzinfo:
-            end_time = datetime.now(start_time.tzinfo)
+            end_time = datetime.now(tz=start_time.tzinfo)
         else:
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(tz=timezone.utc)
         duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
 
         # Determine overall status
