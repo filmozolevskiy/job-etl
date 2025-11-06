@@ -138,7 +138,13 @@ services:
       - ./services:/opt/airflow/services:ro
     ports:
       - "8080:8080"
-    command: webserver
+    command:
+      - bash
+      - -c
+      - |
+        export AIRFLOW_CONN_POSTGRES_DEFAULT="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        export DATABASE_URL="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        exec webserver
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -194,7 +200,13 @@ services:
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
       - ./services:/opt/airflow/services:ro
-    command: scheduler
+    command:
+      - bash
+      - -c
+      - |
+        export AIRFLOW_CONN_POSTGRES_DEFAULT="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        export DATABASE_URL="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        exec scheduler
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
       interval: 30s
