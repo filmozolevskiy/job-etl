@@ -329,8 +329,14 @@ def extract_source_jsearch(**context):
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
-                        with open(secret_path, 'r') as f:
-                            db_password = f.read().strip()
+                        try:
+                            # Try UTF-8 first, then UTF-16 if that fails
+                            with open(secret_path, 'r', encoding='utf-8') as f:
+                                db_password = f.read().strip()
+                        except UnicodeDecodeError:
+                            # Fallback to UTF-16 (Windows might create files in UTF-16)
+                            with open(secret_path, 'r', encoding='utf-16') as f:
+                                db_password = f.read().strip()
                 
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
@@ -462,8 +468,14 @@ def normalize_data(**context):
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
-                        with open(secret_path, 'r') as f:
-                            db_password = f.read().strip()
+                        try:
+                            # Try UTF-8 first, then UTF-16 if that fails
+                            with open(secret_path, 'r', encoding='utf-8') as f:
+                                db_password = f.read().strip()
+                        except UnicodeDecodeError:
+                            # Fallback to UTF-16 (Windows might create files in UTF-16)
+                            with open(secret_path, 'r', encoding='utf-16') as f:
+                                db_password = f.read().strip()
                 
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
@@ -607,8 +619,14 @@ def rank_jobs(**context):
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
-                        with open(secret_path, 'r') as f:
-                            db_password = f.read().strip()
+                        try:
+                            # Try UTF-8 first, then UTF-16 if that fails
+                            with open(secret_path, 'r', encoding='utf-8') as f:
+                                db_password = f.read().strip()
+                        except UnicodeDecodeError:
+                            # Fallback to UTF-16 (Windows might create files in UTF-16)
+                            with open(secret_path, 'r', encoding='utf-16') as f:
+                                db_password = f.read().strip()
                 
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
