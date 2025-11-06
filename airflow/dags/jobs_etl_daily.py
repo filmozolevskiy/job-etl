@@ -137,6 +137,8 @@ def run_dbt_models(models: str, **context):
         os.makedirs(log_path, exist_ok=True)
 
         # Create profiles.yml
+        # Note: The generate_schema_name macro ensures custom schemas are used directly
+        # without prefixing, so the profile schema is just a fallback
         profiles_yml = f"""job_dbt:
         target: docker
         outputs:
@@ -273,6 +275,8 @@ def run_dbt_tests(**context):
         os.makedirs(log_path, exist_ok=True)
 
         # Create profiles.yml
+        # Note: The generate_schema_name macro ensures custom schemas are used directly
+        # without prefixing, so the profile schema is just a fallback
         profiles_yml = f"""job_dbt:
         target: docker
         outputs:
