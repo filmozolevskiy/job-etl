@@ -14,15 +14,15 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 
 Schedule: Daily at 07:00 America/Toronto
 """
-import os
 from datetime import datetime, timedelta
+import os
 from typing import Optional
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.bash import BashOperator
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
-from airflow.models import Variable
 import pendulum
 
 
@@ -34,11 +34,11 @@ import pendulum
 def _get_airflow_var(name: str, default: Optional[str] = None) -> Optional[str]:
     """
     Get Airflow Variable with fallback to environment variable.
-    
+
     Args:
         name: Variable name
         default: Default value if not found
-        
+
     Returns:
         Variable value or default
     """
@@ -347,20 +347,20 @@ def extract_source_jsearch(**context):
                 db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
                 db_password = os.getenv('POSTGRES_PASSWORD')
                 db_name = os.getenv('POSTGRES_DB', 'job_etl')
-                
+
                 # Try to read password from secret file if available
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
                         try:
                             # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, 'r', encoding='utf-8') as f:
+                            with open(secret_path, encoding='utf-8') as f:
                                 db_password = f.read().strip()
                         except UnicodeDecodeError:
                             # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, 'r', encoding='utf-16') as f:
+                            with open(secret_path, encoding='utf-16') as f:
                                 db_password = f.read().strip()
-                
+
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
                     print(f"Built DATABASE_URL from environment variables (host: {db_host})")
@@ -480,20 +480,20 @@ def normalize_data(**context):
                 db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
                 db_password = os.getenv('POSTGRES_PASSWORD')
                 db_name = os.getenv('POSTGRES_DB', 'job_etl')
-                
+
                 # Try to read password from secret file if available
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
                         try:
                             # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, 'r', encoding='utf-8') as f:
+                            with open(secret_path, encoding='utf-8') as f:
                                 db_password = f.read().strip()
                         except UnicodeDecodeError:
                             # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, 'r', encoding='utf-16') as f:
+                            with open(secret_path, encoding='utf-16') as f:
                                 db_password = f.read().strip()
-                
+
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
                     print(f"Built DATABASE_URL from environment variables (host: {db_host})")
@@ -640,20 +640,20 @@ def rank_jobs(**context):
                 db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
                 db_password = os.getenv('POSTGRES_PASSWORD')
                 db_name = os.getenv('POSTGRES_DB', 'job_etl')
-                
+
                 # Try to read password from secret file if available
                 if not db_password:
                     secret_path = '/run/secrets/postgres_password'
                     if os.path.exists(secret_path):
                         try:
                             # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, 'r', encoding='utf-8') as f:
+                            with open(secret_path, encoding='utf-8') as f:
                                 db_password = f.read().strip()
                         except UnicodeDecodeError:
                             # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, 'r', encoding='utf-16') as f:
+                            with open(secret_path, encoding='utf-16') as f:
                                 db_password = f.read().strip()
-                
+
                 if db_password:
                     database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
                     print(f"Built DATABASE_URL from environment variables (host: {db_host})")
