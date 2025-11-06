@@ -14,6 +14,7 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 
 Schedule: Daily at 07:00 America/Toronto
 """
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -41,7 +42,6 @@ def _get_airflow_var(name: str, default: Optional[str] = None) -> Optional[str]:
     Returns:
         Variable value or default
     """
-    import os
     try:
         return Variable.get(name)
     except Exception:
