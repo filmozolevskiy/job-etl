@@ -15,6 +15,7 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 Schedule: Daily at 07:00 America/Toronto
 """
 from datetime import datetime, timedelta
+from typing import Optional
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
@@ -289,7 +290,6 @@ def extract_source_jsearch(**context):
     """
     import os
     import sys
-    from typing import Optional
     from airflow.hooks.base import BaseHook
 
     # Ensure project root is on sys.path to import services
@@ -493,7 +493,6 @@ def normalize_data(**context):
         db = NormalizerDB(database_url)
 
         # Get API key from Airflow Variables for adapter initialization
-        from typing import Optional
         def _var(name: str, default: Optional[str] = None) -> Optional[str]:
             try:
                 return Variable.get(name)
@@ -768,7 +767,6 @@ def send_webhook_notification(**context):
     import json
     import requests
     from datetime import datetime, timezone
-    from typing import Optional
     from airflow.hooks.base import BaseHook
     from airflow.models import TaskInstance
 
