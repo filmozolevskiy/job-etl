@@ -94,7 +94,8 @@ CREATE TABLE IF NOT EXISTS marts.fact_jobs (
     apply_url TEXT,
     rank_score NUMERIC,
     rank_explain JSONB,
-    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Create indexes for marts tables
