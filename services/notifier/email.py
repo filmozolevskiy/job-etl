@@ -4,7 +4,7 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 from .base import NotificationChannel, NotificationMessage
 
@@ -26,14 +26,14 @@ class EmailChannel(NotificationChannel):
 
     def __init__(
         self,
-        smtp_host: Optional[str] = None,
-        smtp_port: Optional[int] = None,
-        smtp_user: Optional[str] = None,
-        smtp_password: Optional[str] = None,
-        sender: Optional[str] = None,
-        recipients: Optional[Sequence[str]] = None,
-        use_tls: Optional[bool] = None,
-        use_ssl: Optional[bool] = None,
+        smtp_host: str | None = None,
+        smtp_port: int | None = None,
+        smtp_user: str | None = None,
+        smtp_password: str | None = None,
+        sender: str | None = None,
+        recipients: Sequence[str] | None = None,
+        use_tls: bool | None = None,
+        use_ssl: bool | None = None,
     ) -> None:
         self.smtp_host = smtp_host or os.getenv("SMTP_HOST")
         self.smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
@@ -51,7 +51,7 @@ class EmailChannel(NotificationChannel):
         if not self.recipients:
             raise ValueError("NOTIFY_TO must be configured with at least one recipient")
 
-    def _resolve_password(self) -> Optional[str]:
+    def _resolve_password(self) -> str | None:
         password = os.getenv("SMTP_PASSWORD")
         if password:
             return password

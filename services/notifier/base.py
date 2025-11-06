@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, Mapping, Any, Optional, Sequence
+from typing import Protocol, Any
+from collections.abc import Mapping, Sequence
 
 
 @dataclass
@@ -16,8 +17,8 @@ class NotificationMessage:
 
     subject: str
     text: str
-    html: Optional[str] = None
-    metadata: Optional[Mapping[str, Any]] = None
+    html: str | None = None
+    metadata: Mapping[str, Any] | None = None
 
 
 class NotificationChannel(Protocol):

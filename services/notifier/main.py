@@ -13,9 +13,7 @@ Usage:
 import argparse
 import json
 import logging
-import os
 import sys
-from typing import Optional
 
 from dotenv import load_dotenv
 
