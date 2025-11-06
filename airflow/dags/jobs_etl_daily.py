@@ -492,6 +492,22 @@ def normalize_data(**context):
         # Initialize database connection
         db = NormalizerDB(database_url)
 
+        # Get API key from Airflow Variables for adapter initialization
+        from typing import Optional
+        def _var(name: str, default: Optional[str] = None) -> Optional[str]:
+            try:
+                return Variable.get(name)
+            except Exception:
+                return os.getenv(name, default)
+
+        jsearch_api_key = _var('JSEARCH_API_KEY')
+        if jsearch_api_key:
+            # Set environment variable so JSearchAdapter can read it
+            os.environ['JSEARCH_API_KEY'] = jsearch_api_key
+            print("JSEARCH_API_KEY set from Airflow Variable")
+        else:
+            print("Warning: JSEARCH_API_KEY not found in Airflow Variables or environment")
+
         # Run normalizer service
         # Filter by source if provided via XCom from extract task
         ti = context['ti']
