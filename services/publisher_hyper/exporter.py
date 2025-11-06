@@ -23,6 +23,7 @@ def export_tables_to_hyper(
             Connection,
             CreateMode,
             HyperProcess,
+            SchemaName,
             SqlType,
             TableDefinition,
             TableName,
@@ -54,8 +55,15 @@ def export_tables_to_hyper(
 
     with HyperProcess(Telemetry.DO_NOT_SEND_USAGE_DATA_TO_TABLEAU) as hyper:
         with Connection(endpoint=hyper.endpoint, database=hyper_path, create_mode=CreateMode.CREATE_AND_REPLACE) as connection:
-            fact_name = TableName("Extract", "fact_jobs")
-            dim_name = TableName("Extract", "dim_companies")
+            # Ensure target schema exists
+            extract_schema = SchemaName("Extract")
+            try:  # hyper doesn't have create_schema_if_not_exists
+                connection.catalog.create_schema(extract_schema)
+            except Exception:
+                pass
+
+            fact_name = TableName(extract_schema, "fact_jobs")
+            dim_name = TableName(extract_schema, "dim_companies")
 
             # Define tables
             fact_def = TableDefinition(fact_name)
