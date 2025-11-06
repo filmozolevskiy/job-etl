@@ -26,6 +26,29 @@ import pendulum
 
 
 # -----------------------------------------------------------------------------
+# Helper Functions
+# -----------------------------------------------------------------------------
+
+
+def _get_airflow_var(name: str, default: Optional[str] = None) -> Optional[str]:
+    """
+    Get Airflow Variable with fallback to environment variable.
+    
+    Args:
+        name: Variable name
+        default: Default value if not found
+        
+    Returns:
+        Variable value or default
+    """
+    import os
+    try:
+        return Variable.get(name)
+    except Exception:
+        return os.getenv(name, default)
+
+
+# -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
 
@@ -349,19 +372,13 @@ def extract_source_jsearch(**context):
                     ) from None
 
         # Resolve API configuration from Airflow Variables with env fallbacks
-        def _var(name: str, default: Optional[str] = None) -> Optional[str]:
-            try:
-                return Variable.get(name)
-            except Exception:
-                return os.getenv(name, default)
-
-        jsearch_api_key = _var('JSEARCH_API_KEY')
-        jsearch_base_url = _var('JSEARCH_BASE_URL', 'https://api.openwebninja.com')
-        jsearch_query = _var('JSEARCH_QUERY', 'analytics engineer')
-        jsearch_location = _var('JSEARCH_LOCATION', 'United States')
-        jsearch_date_posted = _var('JSEARCH_DATE_POSTED', 'month')
+        jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
+        jsearch_base_url = _get_airflow_var('JSEARCH_BASE_URL', 'https://api.openwebninja.com')
+        jsearch_query = _get_airflow_var('JSEARCH_QUERY', 'analytics engineer')
+        jsearch_location = _get_airflow_var('JSEARCH_LOCATION', 'United States')
+        jsearch_date_posted = _get_airflow_var('JSEARCH_DATE_POSTED', 'month')
         try:
-            jsearch_max_jobs = int(_var('JSEARCH_MAX_JOBS', '20') or '20')
+            jsearch_max_jobs = int(_get_airflow_var('JSEARCH_MAX_JOBS', '20') or '20')
         except ValueError:
             jsearch_max_jobs = 20
 
@@ -493,13 +510,7 @@ def normalize_data(**context):
         db = NormalizerDB(database_url)
 
         # Get API key from Airflow Variables for adapter initialization
-        def _var(name: str, default: Optional[str] = None) -> Optional[str]:
-            try:
-                return Variable.get(name)
-            except Exception:
-                return os.getenv(name, default)
-
-        jsearch_api_key = _var('JSEARCH_API_KEY')
+        jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
         if jsearch_api_key:
             # Set environment variable so JSearchAdapter can read it
             os.environ['JSEARCH_API_KEY'] = jsearch_api_key
@@ -946,13 +957,7 @@ def send_webhook_notification(**context):
         }
 
         # Get webhook URL from Airflow Variables or environment
-        def _get_webhook_url() -> Optional[str]:
-            try:
-                return Variable.get('WEBHOOK_URL')
-            except Exception:
-                return os.getenv('WEBHOOK_URL')
-
-        webhook_url = _get_webhook_url()
+        webhook_url = _get_airflow_var('WEBHOOK_URL')
 
         if not webhook_url:
             print("=" * 60)
