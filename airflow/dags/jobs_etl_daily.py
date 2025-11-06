@@ -791,14 +791,70 @@ def publish_to_tableau(**context):
     print("PUBLISH TASK")
     print("=" * 60)
     try:
+        import sys
+        from pathlib import Path
+
+        # Add services directory to Python path if not already there
+        services_path = Path("/opt/airflow/services")
+        if str(services_path) not in sys.path:
+            sys.path.insert(0, str(services_path))
+
+        # Also add parent directory to allow 'from services...' imports
+        airflow_path = Path("/opt/airflow")
+        if str(airflow_path) not in sys.path:
+            sys.path.insert(0, str(airflow_path))
+
         # Lazy import to avoid heavy deps unless this task runs
         from services.publisher_hyper.exporter import export_from_env
+
+        # Get database URL for export
+        try:
+            from airflow.hooks.base import BaseHook
+            conn = BaseHook.get_connection('postgres_default')
+            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
+            print("Using Airflow connection: postgres_default")
+        except Exception as e:
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            # Try DATABASE_URL first
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                # Build from individual components
+                db_host = os.getenv('POSTGRES_HOST', 'postgres')
+                db_port = os.getenv('POSTGRES_PORT', '5432')
+                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+                db_password = os.getenv('POSTGRES_PASSWORD')
+                db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+                # Try to read password from secret file if available
+                if not db_password:
+                    secret_path = '/run/secrets/postgres_password'
+                    if os.path.exists(secret_path):
+                        try:
+                            with open(secret_path, encoding='utf-8') as f:
+                                db_password = f.read().strip()
+                        except UnicodeDecodeError:
+                            with open(secret_path, encoding='utf-16') as f:
+                                db_password = f.read().strip()
+
+                if not db_password:
+                    raise ValueError(
+                        "Database password must be configured via Airflow connection 'postgres_default', "
+                        "POSTGRES_PASSWORD environment variable, or /run/secrets/postgres_password file"
+                    ) from None
+
+                database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+
+        # Set DATABASE_URL for export_from_env
+        os.environ['DATABASE_URL'] = database_url
+
         hyper_path = export_from_env(output_dir="artifacts", hyper_filename="jobs_ranked.hyper")
         print(f"Created hyper: {hyper_path}")
         print("=" * 60)
         return {"hyper_file": hyper_path}
     except Exception as e:
         print("Publish failed:", e)
+        import traceback
+        traceback.print_exc()
         print("=" * 60)
         # Still return a value for downstream tasks
         return {"hyper_file": None, "error": str(e)}
