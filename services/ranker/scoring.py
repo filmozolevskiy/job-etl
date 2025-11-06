@@ -149,6 +149,20 @@ def calculate_salary_score(
     Returns:
         Score between 0 and 1
     """
+    # Normalize numeric types (database may return Decimal)
+    try:
+        if salary_min is not None:
+            salary_min = float(salary_min)
+        if salary_max is not None:
+            salary_max = float(salary_max)
+        if salary_target_min is not None:
+            salary_target_min = float(salary_target_min)
+        if salary_target_max is not None:
+            salary_target_max = float(salary_target_max)
+    except Exception:
+        # If conversion fails, fall back to neutral score
+        return 0.5
+
     if not salary_min and not salary_max:
         return 0.5  # No salary info - neutral score
 
