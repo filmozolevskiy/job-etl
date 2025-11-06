@@ -159,10 +159,13 @@ def run_dbt_models(models: str, **context):
             f.write(profiles_yml)
 
         # Run dbt command
+        # Build dbt command using separate selectors to ensure matching
+        selectors = models.split()
         cmd = [
             'dbt',
             'run',
-            '--models', models,
+            '--select',
+            *selectors,
             '--project-dir', project_dir,
             '--profiles-dir', profiles_dir,
             '--target-path', target_path,
@@ -205,7 +208,8 @@ def run_dbt_models(models: str, **context):
 
 def run_core_dbt_models(**context):
     """Run core dbt models (dimensions and facts)."""
-    return run_dbt_models(models="dim_* fact_*", **context)
+    # Explicit model names to avoid selector mismatch
+    return run_dbt_models(models="dim_companies fact_jobs", **context)
 
 
 def run_dbt_tests(**context):
