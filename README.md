@@ -75,7 +75,6 @@ A learning project that builds a hands-on ETL system for ingesting, processing, 
 ✅ **Phase 0 - Step 4 Complete**: Airflow (LocalExecutor) running
 - PostgreSQL database with schemas: `raw`, `staging`, `marts`
 - Airflow webserver and scheduler operational
-- Example DAG for testing
 - Database connections configured
 - Docker Compose orchestration ready
 - **GitHub Actions CI/CD** pipeline ✨
@@ -179,9 +178,9 @@ open http://localhost:8080  # or visit in browser
 docker-compose logs airflow-webserver
 docker-compose logs airflow-scheduler
 
-# Trigger example DAG
-docker-compose exec airflow-webserver airflow dags unpause example_dag
-docker-compose exec airflow-webserver airflow dags trigger example_dag
+# Trigger main DAG (after configuration)
+# docker-compose exec airflow-webserver airflow dags unpause jobs_etl_daily
+# docker-compose exec airflow-webserver airflow dags trigger jobs_etl_daily
 
 # Stop all services
 docker-compose down
