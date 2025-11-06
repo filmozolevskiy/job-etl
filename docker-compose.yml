@@ -119,7 +119,14 @@ services:
       AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS: 'false'
       AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
       AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      # Database connection components for fallback (password read from secret file)
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: ${POSTGRES_USER:-job_etl_user}
+      POSTGRES_DB: ${POSTGRES_DB:-job_etl}
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    secrets:
+      - postgres_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/plugins:/opt/airflow/plugins:ro
@@ -170,7 +177,14 @@ services:
       AIRFLOW__CORE__SECURITY__COOKIE_SECURE: 'false'
       AIRFLOW__CORE__SECURITY__COOKIE_HTTP_ONLY: 'true'
       AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS: 'false'
+      # Database connection components for fallback (password read from secret file)
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: ${POSTGRES_USER:-job_etl_user}
+      POSTGRES_DB: ${POSTGRES_DB:-job_etl}
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
+    secrets:
+      - postgres_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/plugins:/opt/airflow/plugins:ro

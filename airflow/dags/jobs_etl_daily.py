@@ -314,13 +314,33 @@ def extract_source_jsearch(**context):
             database_url = conn.get_uri().replace('postgres://', 'postgresql://')
             print("Using Airflow connection: postgres_default")
         except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            # Try DATABASE_URL first
             database_url = os.getenv('DATABASE_URL')
+            # If not set, build from individual components
             if not database_url:
-                raise ValueError(
-                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                    "or environment variable 'DATABASE_URL'"
-                ) from None
+                db_host = os.getenv('POSTGRES_HOST', 'postgres')
+                db_port = os.getenv('POSTGRES_PORT', '5432')
+                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+                db_password = os.getenv('POSTGRES_PASSWORD')
+                db_name = os.getenv('POSTGRES_DB', 'job_etl')
+                
+                # Try to read password from secret file if available
+                if not db_password:
+                    secret_path = '/run/secrets/postgres_password'
+                    if os.path.exists(secret_path):
+                        with open(secret_path, 'r') as f:
+                            db_password = f.read().strip()
+                
+                if db_password:
+                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
+                else:
+                    raise ValueError(
+                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                        "or environment variables (DATABASE_URL or POSTGRES_*). "
+                        "Also ensure postgres_password secret is mounted."
+                    ) from None
 
         # Resolve API configuration from Airflow Variables with env fallbacks
         def _var(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -421,19 +441,39 @@ def normalize_data(**context):
         from services.normalizer.db_operations import NormalizerDB, DatabaseError
         from services.normalizer.main import run_normalizer
 
-        # Get database URL from Airflow connection
+        # Get database URL from Airflow connection with fallback to env
         try:
             conn = BaseHook.get_connection('postgres_default')
             database_url = conn.get_uri().replace('postgres://', 'postgresql://')
             print("Using Airflow connection: postgres_default")
         except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            # Try DATABASE_URL first
             database_url = os.getenv('DATABASE_URL')
+            # If not set, build from individual components
             if not database_url:
-                raise ValueError(
-                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                    "or environment variable 'DATABASE_URL'"
-                ) from None
+                db_host = os.getenv('POSTGRES_HOST', 'postgres')
+                db_port = os.getenv('POSTGRES_PORT', '5432')
+                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+                db_password = os.getenv('POSTGRES_PASSWORD')
+                db_name = os.getenv('POSTGRES_DB', 'job_etl')
+                
+                # Try to read password from secret file if available
+                if not db_password:
+                    secret_path = '/run/secrets/postgres_password'
+                    if os.path.exists(secret_path):
+                        with open(secret_path, 'r') as f:
+                            db_password = f.read().strip()
+                
+                if db_password:
+                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
+                else:
+                    raise ValueError(
+                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                        "or environment variables (DATABASE_URL or POSTGRES_*). "
+                        "Also ensure postgres_password secret is mounted."
+                    ) from None
 
         print("Connecting to database...")
 
@@ -546,19 +586,39 @@ def rank_jobs(**context):
         from services.ranker.config_loader import load_ranking_config
         from services.ranker.scoring import calculate_rank
 
-        # Get database URL from Airflow connection
+        # Get database URL from Airflow connection with fallback to env
         try:
             conn = BaseHook.get_connection('postgres_default')
             database_url = conn.get_uri().replace('postgres://', 'postgresql://')
             print("Using Airflow connection: postgres_default")
         except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
+            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+            # Try DATABASE_URL first
             database_url = os.getenv('DATABASE_URL')
+            # If not set, build from individual components
             if not database_url:
-                raise ValueError(
-                    "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                    "or environment variable 'DATABASE_URL'"
-                ) from None
+                db_host = os.getenv('POSTGRES_HOST', 'postgres')
+                db_port = os.getenv('POSTGRES_PORT', '5432')
+                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+                db_password = os.getenv('POSTGRES_PASSWORD')
+                db_name = os.getenv('POSTGRES_DB', 'job_etl')
+                
+                # Try to read password from secret file if available
+                if not db_password:
+                    secret_path = '/run/secrets/postgres_password'
+                    if os.path.exists(secret_path):
+                        with open(secret_path, 'r') as f:
+                            db_password = f.read().strip()
+                
+                if db_password:
+                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
+                else:
+                    raise ValueError(
+                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
+                        "or environment variables (DATABASE_URL or POSTGRES_*). "
+                        "Also ensure postgres_password secret is mounted."
+                    ) from None
 
         print("Loading ranking configuration...")
         config = load_ranking_config()
