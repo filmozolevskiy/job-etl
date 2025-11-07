@@ -119,6 +119,12 @@ services:
       AIRFLOW__CORE__HIDE_SENSITIVE_VAR_CONN_FIELDS: 'false'
       AIRFLOW__CORE__DEFAULT_UI_TIMEZONE: ${TIMEZONE:-America/Toronto}
       AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TIMEZONE:-America/Toronto}
+      # Notification (email) configuration
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_FROM: ${SMTP_FROM}
+      NOTIFY_TO: ${NOTIFY_TO}
       # Database connection components for fallback (password read from secret file)
       POSTGRES_HOST: postgres
       POSTGRES_PORT: '5432'
@@ -127,6 +133,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     secrets:
       - postgres_password
+      - smtp_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/plugins:/opt/airflow/plugins:ro
@@ -188,9 +195,16 @@ services:
       POSTGRES_PORT: '5432'
       POSTGRES_USER: ${POSTGRES_USER:-job_etl_user}
       POSTGRES_DB: ${POSTGRES_DB:-job_etl}
+      # Notification (email) configuration
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_FROM: ${SMTP_FROM}
+      NOTIFY_TO: ${NOTIFY_TO}
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     secrets:
       - postgres_password
+      - smtp_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/plugins:/opt/airflow/plugins:ro
@@ -281,6 +295,8 @@ secrets:
     file: ./secrets/database/postgres_password.txt
   airflow_postgres_password:
     file: ./secrets/airflow/airflow_postgres_password.txt
+  smtp_password:
+    file: ./secrets/notifications/smtp_password.txt
 
 # Network for service communication
 networks:

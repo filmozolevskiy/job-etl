@@ -118,24 +118,20 @@ JSEARCH_API_KEY must be set as an Airflow Variable or environment variable
 
 Or set in `.env` and it will be available as environment variable.
 
-### Issue: Webhook Not Sending
+### Issue: Email Not Sending
 
 **Symptoms:**
-- Task completes but no notification received
-- Logs show "no webhook URL configured"
+- Task completes but no email received
+- Logs show SMTP connection/auth errors
 
 **Solution:**
-1. Get webhook URL (Slack/Discord/Teams)
-2. Add to Airflow Variables:
-   - Variable: `WEBHOOK_URL`
-   - Value: `https://hooks.slack.com/services/YOUR/WEBHOOK/URL`
+1. Configure SMTP settings for Airflow containers:
+   - `SMTP_HOST` (required)
+   - `SMTP_FROM` (required)
+   - `NOTIFY_TO` (required)
+   - `SMTP_USER` (optional) and `secrets/notifications/smtp_password.txt` if auth required
 
-Or add to `.env`:
-```bash
-WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-```
-
-**Note:** Webhook failures don't fail the DAG - they're logged but the pipeline continues.
+**Note:** Notification failures don't fail the DAG - they're logged but the pipeline continues.
 
 ### Issue: dbt Tests Failing
 

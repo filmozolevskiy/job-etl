@@ -10,7 +10,7 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 6. Ranks jobs based on configurable weights
 7. Runs data quality tests
 8. Publishes results to Tableau Hyper files
-9. Sends webhook notification with summary
+9. Sends notification email with summary
 
 Schedule: Daily at 07:00 America/Toronto
 """
@@ -864,21 +864,19 @@ def publish_to_tableau(**context):
         return {"hyper_file": None, "error": str(e)}
 
 
-def send_webhook_notification(**context):
+def send_notification_email(**context):
     """
-    Send daily summary to configured webhook (Slack/Discord).
+    Send daily summary via email (SMTP).
 
     This function:
     - Collects counts from XCom (extracted, staged, ranked)
     - Queries database for top ranked jobs
-    - Reads webhook URL from Airflow Variables/environment
-    - Formats summary JSON with top matches and failures
-    - POSTs to webhook endpoint
+    - Formats summary text/HTML with top matches and failures
+    - Sends email via SMTP (see SMTP_* env vars)
     """
     import os
     import sys
     import json
-    import requests
     from datetime import datetime, timezone
     from airflow.hooks.base import BaseHook
     from airflow.models import TaskInstance
@@ -889,7 +887,7 @@ def send_webhook_notification(**context):
         sys.path.insert(0, project_root)
 
     print("=" * 60)
-    print("WEBHOOK NOTIFICATION TASK - Starting")
+    print("NOTIFICATION EMAIL TASK - Starting")
     print("=" * 60)
 
     try:
@@ -950,23 +948,9 @@ def send_webhook_notification(**context):
                         """)
                         deduped_unique_count = cur.fetchone()['count'] or 0
 
-                        # Get total ranked jobs (for potential future use)
-                        # Currently not used in payload, but kept for completeness
-                        cur.execute("""
-                            SELECT COUNT(*) as count
-                            FROM marts.fact_jobs
-                            WHERE rank_score IS NOT NULL
-                        """)
-                        # Note: total_ranked not used in current payload, but query kept for stats
-                        _ = cur.fetchone()['count'] or 0
-
-                        # Get top 25 ranked jobs from this run
-                        # Filter for jobs ingested since the DAG execution date
-                        # This ensures we only show new matches from the current run
+                        # Get top 25 ranked jobs filtered to current run timeframe
                         execution_date = dag_run.execution_date
                         if execution_date:
-                            # Filter for jobs ingested since the execution date (start of this run)
-                            # Use a small buffer (1 hour before) to account for any timing edge cases
                             filter_time = execution_date - timedelta(hours=1)
                             print(f"Filtering top matches for jobs ingested since: {filter_time}")
                             cur.execute("""
@@ -984,10 +968,9 @@ def send_webhook_notification(**context):
                                 LIMIT 25
                             """, (filter_time,))
                         else:
-                            # Fallback: if no execution_date, use last 24 hours from start_date
                             if dag_run.start_date:
                                 filter_time = dag_run.start_date - timedelta(hours=24)
-                                print(f"Using fallback: filtering top matches for jobs ingested since: {filter_time} (24h before start_date)")
+                                print(f"Using fallback: filtering jobs since: {filter_time} (24h before start)")
                                 cur.execute("""
                                     SELECT
                                         f.job_title_std as title,
@@ -1003,8 +986,7 @@ def send_webhook_notification(**context):
                                     LIMIT 25
                                 """, (filter_time,))
                             else:
-                                # Last resort: get top 25 without time filter
-                                print("Warning: No execution_date or start_date available, fetching top 25 without time filter")
+                                print("Warning: No execution_date or start_date; fetching top 25 without time filter")
                                 cur.execute("""
                                     SELECT
                                         f.job_title_std as title,
@@ -1031,17 +1013,16 @@ def send_webhook_notification(**context):
 
             except Exception as e:
                 print(f"Warning: Failed to query database for top matches: {e}")
-                print("Continuing with webhook notification without database data")
+                print("Continuing with email notification without database data")
 
         # Collect failed tasks
         failed_tasks = []
         if not is_success:
-            # Check all tasks in the DAG run
             for task_instance in dag_run.get_task_instances():
                 if task_instance.state == 'failed':
                     failed_tasks.append(task_instance.task_id)
 
-        # Build webhook payload
+        # Build payload
         payload = {
             "run_id": dag_run.run_id,
             "status": "success" if is_success else "failed",
@@ -1058,69 +1039,92 @@ def send_webhook_notification(**context):
             "duration_sec": duration_sec
         }
 
-        # Get webhook URL from Airflow Variables or environment
-        webhook_url = _get_airflow_var('WEBHOOK_URL')
+        # Prepare email content
+        subject = f"Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'} (run_id={dag_run.run_id})"
+        lines = [
+            f"Status: {'SUCCESS' if is_success else 'FAILED'}",
+            f"Duration: {duration_sec}s",
+            "Counts:",
+            f"  - extracted: {extracted_count}",
+            f"  - staged: {normalized_count}",
+            f"  - deduped_unique: {deduped_unique_count}",
+            f"  - enriched: {enriched_count}",
+            f"  - ranked: {ranked_count}",
+            f"  - new_top_matches: {len(top_matches)}",
+        ]
+        if failed_tasks:
+            lines.append("Failed tasks:")
+            for t in failed_tasks:
+                lines.append(f"  - {t}")
+        if top_matches:
+            lines.append("")
+            lines.append("Top matches:")
+            for job in top_matches[:10]:
+                lines.append(f"  - {job['title']} @ {job['company']} ({job['location']}) score={job['score']:.2f}")
 
-        if not webhook_url:
-            print("=" * 60)
-            print("WEBHOOK NOTIFICATION TASK - Skipped (no webhook URL configured)")
-            print("=" * 60)
-            print("To enable webhook notifications, set WEBHOOK_URL as:")
-            print("  - Airflow Variable: WEBHOOK_URL")
-            print("  - Environment variable: WEBHOOK_URL")
-            print("=" * 60)
-            print("Payload that would have been sent:")
-            print(json.dumps(payload, indent=2))
-            print("=" * 60)
-            return {"notification_sent": False, "reason": "no_webhook_url", "payload": payload}
+        text_body = "\n".join(lines)
 
-        # Send webhook notification
+        # HTML body (optional) - escape user data for security
+        from html import escape
+        html_rows = "".join(
+            f"<tr><td>{escape(str(j['title'] or ''))}</td><td>{escape(str(j['company'] or ''))}</td>"
+            f"<td>{escape(str(j['location'] or ''))}</td><td>{j['score']:.2f}</td>"
+            f"<td><a href='{escape(str(j['apply_url'] or ''))}'>Apply</a></td></tr>"
+            for j in top_matches[:25]
+        )
+        failed_tasks_escaped = ', '.join(escape(t) for t in failed_tasks) if failed_tasks else ''
+        html_body = f"""
+        <h3>Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'}</h3>
+        <p><strong>Duration:</strong> {duration_sec}s</p>
+        <ul>
+          <li>extracted: {extracted_count}</li>
+          <li>staged: {normalized_count}</li>
+          <li>deduped_unique: {deduped_unique_count}</li>
+          <li>enriched: {enriched_count}</li>
+          <li>ranked: {ranked_count}</li>
+          <li>new_top_matches: {len(top_matches)}</li>
+        </ul>
+        {f'<p><strong>Failed tasks:</strong> {failed_tasks_escaped}</p>' if failed_tasks else ''}
+        <table border="1" cellpadding="4" cellspacing="0">
+          <thead><tr><th>Title</th><th>Company</th><th>Location</th><th>Score</th><th>Link</th></tr></thead>
+          <tbody>{html_rows}</tbody>
+        </table>
+        """
+
+        # Send email via notifier service
         try:
-            print(f"Sending webhook notification to: {webhook_url}")
-            response = requests.post(
-                webhook_url,
-                json=payload,
-                headers={'Content-Type': 'application/json'},
-                timeout=30  # 30 second timeout
-            )
-            response.raise_for_status()  # Raise exception for bad status codes
+            from services.notifier.base import NotificationMessage
+            from services.notifier.email import EmailChannel
+
+            channel = EmailChannel()
+            channel.send(NotificationMessage(
+                subject=subject,
+                text=text_body,
+                html=html_body,
+                metadata=payload,
+            ))
 
             print("=" * 60)
-            print("WEBHOOK NOTIFICATION TASK - Success")
+            print("NOTIFICATION EMAIL TASK - Success")
             print("=" * 60)
-            print(f"Response status: {response.status_code}")
-            print(f"Payload sent: {json.dumps(payload, indent=2)}")
+            return {"notification_sent": True, "payload": payload}
+        except Exception as e:
             print("=" * 60)
-
-            return {
-                "notification_sent": True,
-                "status_code": response.status_code,
-                "payload": payload
-            }
-
-        except requests.exceptions.RequestException as e:
-            print("=" * 60)
-            print("WEBHOOK NOTIFICATION TASK - Failed to send webhook")
+            print("NOTIFICATION EMAIL TASK - Failed to send email")
             print("=" * 60)
             print(f"Error: {e}")
             print("Payload that failed to send:")
             print(json.dumps(payload, indent=2))
             print("=" * 60)
-            # Don't raise - we don't want webhook failures to fail the DAG
-            return {
-                "notification_sent": False,
-                "error": str(e),
-                "payload": payload
-            }
+            return {"notification_sent": False, "error": str(e), "payload": payload}
 
     except Exception as e:
         print("=" * 60)
-        print("WEBHOOK NOTIFICATION TASK - Unexpected Error")
+        print("NOTIFICATION EMAIL TASK - Unexpected Error")
         print("=" * 60)
         print(f"Error: {e}")
         print(f"Error type: {type(e).__name__}")
         print("=" * 60)
-        # Don't raise - we don't want webhook failures to fail the DAG
         return {"notification_sent": False, "error": str(e)}
 
 
@@ -1292,19 +1296,19 @@ with DAG(
     )
 
     # -------------------------------------------------------------------------
-    # Task 11: Send webhook notification
+    # Task 11: Send notification email
     # -------------------------------------------------------------------------
-    notify_webhook_daily = PythonOperator(
-        task_id="notify_webhook_daily",
-        python_callable=send_webhook_notification,
+    notify_daily = PythonOperator(
+        task_id="notify_daily",
+        python_callable=send_notification_email,
         retries=2,
         trigger_rule="all_done",  # Run even if upstream tasks fail
         doc_md="""
-        **Send daily summary webhook**
+        **Send daily summary email**
 
         - Collects counts from all tasks (extracted, staged, ranked)
-        - Formats summary JSON with top matches
-        - POSTs to configured Slack/Discord webhook
+        - Formats summary with top matches
+        - Sends via SMTP (see SMTP_* env vars)
         - Runs even if upstream tasks fail (to report errors)
         """
     )
@@ -1334,6 +1338,6 @@ with DAG(
     dedupe_consolidate >> rank
     rank >> dbt_tests
     dbt_tests >> publish_hyper
-    publish_hyper >> notify_webhook_daily
-    notify_webhook_daily >> end
+    publish_hyper >> notify_daily
+    notify_daily >> end
 

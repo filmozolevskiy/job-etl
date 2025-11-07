@@ -14,7 +14,7 @@
 * **Rank** each posting using configurable weights: title keywords, skills, location, salary, employment type, seniority, remote/hybrid, company size.
 * **Publish** to Tableau via **Hyper API** (dashboard + ranked list).
 * **Orchestrate** with **Airflow** (daily 07:00 America/Toronto).
-* Provide **visibility** (task logs + daily webhook digest).
+* Provide **visibility** (task logs + daily email digest).
 * Ensure **durability** (tests) and **security** (secrets handling).
 
 ### Non-Goals (for MVP)
@@ -34,7 +34,7 @@
 * **Infra**: Postgres, Airflow (LocalExecutor), pgAdmin (optional).
 * **Data model**: `raw` → `staging` (dbt) → `marts` (dbt).
 * **Schedule**: daily 07:00 America/Toronto.
-* **Notifications**: Slack/Discord webhook (counts, new matches, failures).
+* **Notifications**: Email via SMTP (counts, new matches, failures).
 * **Observability**: Airflow logs + simple metrics counters.
 * **Security**: `.env` + Docker secrets.
 * **Testing**: pytest for services; dbt schema & generic tests.
@@ -96,7 +96,7 @@
 7. `rank` (service call / container)
 8. `dbt_tests` (schema+generic)
 9. `publish_hyper` (publisher-hyper)
-10. `notify_webhook_daily` (summary counts + failures)
+10. `notify_daily` (summary counts + failures)
 11. `end` (Dummy)
 
 **Reliability & Idempotency**
@@ -270,7 +270,7 @@ Store **`rank_explain`** as a JSON map of feature→subscore for transparency.
 
 ---
 
-## 10) Notifications (Webhook)
+## 10) Notifications (Email)
 
 **Schedule:** After daily run.
 **Payload (example):**
@@ -296,7 +296,7 @@ Store **`rank_explain`** as a JSON map of feature→subscore for transparency.
 }
 ```
 
-* **Channels**: Slack/Discord/Teams webhook URL from env/secret.
+* **Channels**: SMTP email from env/secret.
 * **Failure mode**: if any task fails, send partial counts + failing task names.
 
 ---
@@ -350,7 +350,7 @@ job-etl/
 ### Environment & Secrets
 
 * `.env` for non-sensitive config (ports, local toggles).
-* Docker **secrets** for API keys & webhook URLs (`secrets/` mounted to containers).
+* Docker **secrets** for API keys & SMTP password (`secrets/` mounted to containers).
 * Airflow connections/variables created via `airflow-init` command.
 
 ---
@@ -436,7 +436,7 @@ job-etl/
 * ✅ Deduped unique rows in `marts.fact_jobs` keyed by `hash_key`.
 * ✅ Rank scores computed and persisted with `rank_explain`.
 * ✅ `.hyper` exported; Tableau dashboard shows ranked list with working filters.
-* ✅ Webhook sends daily summary with counts and failures.
+* ✅ Email sends daily summary with counts and failures.
 * ✅ pytest + dbt tests pass locally.
 
 **Phase 1**
@@ -464,7 +464,7 @@ job-etl/
 
 * updates `marts.fact_jobs.rank_score` and `rank_explain` (JSON)
 
-**Webhook**: POST to `$WEBHOOK_URL` with run summary JSON (see above).
+**Email**: SMTP email to `NOTIFY_TO` with summary (text + HTML).
 
 ---
 
@@ -500,7 +500,7 @@ standard_titles:
 ## 21) Local Runbook
 
 1. `cp dbt/job_dbt/profiles.yml.example ~/.dbt/profiles.yml` and fill Postgres creds.
-2. `cp .env.example .env` and set env vars (DB URL, webhook URL).
+2. `cp .env.example .env` and set env vars (DB URL, SMTP settings).
 3. `docker compose up --build`
 4. Open Airflow UI → trigger `jobs_etl_daily`.
 5. After success, find exported `.hyper` in `./artifacts/` and open in Tableau Desktop (or configure Tableau Server publish).

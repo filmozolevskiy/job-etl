@@ -54,21 +54,16 @@ Add to your `.env` file:
 JSEARCH_API_KEY=your_api_key_here
 ```
 
-### 1.4 Set Up Webhook URL (Optional)
+### 1.4 Configure Email Notifications (Optional)
 
-If you want to test webhook notifications:
+If you want to test email notifications, set the following (env or Airflow env):
 
-**Option A: Via Airflow UI**
-1. Go to Admin → Variables
-2. Add variable: `WEBHOOK_URL` with your webhook URL (e.g., Slack/Discord webhook)
-
-**Option B: Via Environment Variable**
-Add to your `.env` file:
-```bash
-WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
-```
-
-**Note:** If not configured, the webhook task will log a warning and show what would have been sent.
+- `SMTP_HOST` (required)
+- `SMTP_PORT` (default 587)
+- `SMTP_USER` (optional)
+- `SMTP_FROM` (required)
+- `NOTIFY_TO` (required, comma-separated emails)
+- Secret file (optional for auth): `secrets/notifications/smtp_password.txt`
 
 ## Step 2: Start Services
 
@@ -150,7 +145,11 @@ Go to Admin → Variables in Airflow UI and add:
 | `JSEARCH_QUERY` | (Optional) Search query | `analytics engineer` |
 | `JSEARCH_LOCATION` | (Optional) Location filter | `United States` |
 | `JSEARCH_MAX_JOBS` | (Optional) Max jobs to fetch | `20` |
-| `WEBHOOK_URL` | (Optional) Webhook URL for notifications | `https://hooks.slack.com/...` |
+| `SMTP_HOST` | (Optional) SMTP server hostname | `smtp.gmail.com` |
+| `SMTP_PORT` | (Optional) SMTP port | `587` |
+| `SMTP_USER` | (Optional) SMTP username | `user@example.com` |
+| `SMTP_FROM` | (Optional) From address | `job-etl@example.com` |
+| `NOTIFY_TO` | (Optional) Comma-separated recipients | `me@example.com,team@example.com` |
 
 ### 4.2 Verify Variables
 
@@ -275,15 +274,15 @@ HAVING COUNT(*) > 1;
 
 **Expected:** Should return 0 rows (all hash_keys are unique).
 
-### 7.2 Check Webhook Notification
+### 7.2 Check Email Notification
 
-If webhook URL is configured:
-- Check your Slack/Discord channel for notification
-- Should show summary with counts and top matches
+If SMTP is configured:
+- Check recipient inbox for summary email
+- Should show counts and top matches
 
 If not configured:
-- Check Airflow logs for `notify_webhook_daily` task
-- Should show warning and payload that would have been sent
+- Check Airflow logs for `notify_daily` task
+- Errors are logged but won't fail the DAG
 
 ## Step 8: Verify Complete Flow
 
@@ -299,7 +298,7 @@ The DAG should execute in this order:
 7. ✅ `rank` - Ranks jobs by score
 8. ✅ `dbt_tests` - Validates data quality
 9. ✅ `publish_hyper` - Exports to Tableau
-10. ✅ `notify_webhook_daily` - Sends summary
+10. ✅ `notify_daily` - Sends summary email
 11. ✅ `end` - Dummy task
 
 ### 8.2 Check Final Results
@@ -359,10 +358,10 @@ docker-compose logs airflow-scheduler | grep -i error
 - Verify dbt can connect: Check `dbt_models_core` task logs
 - Check for null values in required fields
 
-**5. Webhook not sending:**
-- Check if `WEBHOOK_URL` is configured
-- Verify webhook URL is valid
-- Check task logs for errors (task won't fail DAG on webhook errors)
+**5. Email not sending:**
+- Check `SMTP_HOST`, `SMTP_FROM`, `NOTIFY_TO`
+- If auth needed, set `SMTP_USER` and add `secrets/notifications/smtp_password.txt`
+- Check task logs for errors (task won't fail the DAG)
 
 ## Step 10: Re-run Tests
 
@@ -403,7 +402,7 @@ HAVING COUNT(*) > 1;
 ✅ **Jobs are ranked** (rank_score populated)  
 ✅ **dbt tests pass** (no data quality issues)  
 ✅ **Hyper file created** (Tableau export ready)  
-✅ **Webhook notification sent** (if configured)  
+✅ **Email notification sent** (if configured)  
 ✅ **No duplicate jobs** (hash_key deduplication works)  
 ✅ **Re-runs are idempotent** (no duplicates on re-run)
 

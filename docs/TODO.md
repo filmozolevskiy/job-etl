@@ -51,7 +51,7 @@
 
 * [x] **Airflow DAG skeleton (`jobs_etl_daily`)**
 
-  * **AC:** DAG contains tasks: `start → extract_{source} → normalize → enrich → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_webhook_daily → end`; manual trigger succeeds for no-op steps.
+  * **AC:** DAG contains tasks: `start → extract_{source} → normalize → enrich → dbt_models_core → dedupe_consolidate → rank → publish_hyper → notify_daily → end`; manual trigger succeeds for no-op steps.
 
 * [x] **Normalizer service**
 
@@ -80,10 +80,10 @@
   * **AC:** `.hyper` files produced under `./artifacts/`; opening in Tableau Desktop shows rows & essential fields.
   * **Implementation:** `services.publisher_hyper` exports `.hyper` and Airflow `publish_to_tableau` task invokes it.
 
-* [x] **Webhook notifier**
+* [x] **Notification email**
 
-  * **AC:** After DAG success/fail, a POST hits configured webhook with counts & any failures (logged in Airflow).
-  * **Implementation:** Implemented `send_webhook_notification` function that collects counts from XCom, queries database for top ranked jobs, formats JSON payload, and POSTs to webhook URL. Handles errors gracefully and filters top matches for current run.
+  * **AC:** After DAG success/fail, an email is sent with counts & any failures (logged in Airflow).
+  * **Implementation:** Implemented `send_notification_email` that collects counts from XCom, queries database for top ranked jobs, formats text/HTML, and sends via SMTP. Handles errors gracefully and filters top matches for current run.
 
 * [x] **MVP run schedule**
 
@@ -217,7 +217,7 @@
   * ≥1 source integrated; ≥100 postings ingested.
   * Deduped unique rows in `marts.fact_jobs` on `hash_key`.
   * Minimal rank with `rank_explain`; Hyper export opens in Tableau.
-  * Webhook summary posts after run.
+  * Summary email sent after run.
   * `pytest` + `dbt test` pass.
 
 * **Phase 1 DoD (Quality & Features):**
@@ -246,4 +246,4 @@
 
 ## Quickstart Order (single-day sprint suggestion)
 
-1. Scaffold repo → 2) Postgres + Airflow up → 3) Source adapter (mock → real) → 4) Raw→staging dbt → 5) Dedupe + rank (stub) → 6) Hyper export → 7) Webhook → 8) Daily schedule.
+1. Scaffold repo → 2) Postgres + Airflow up → 3) Source adapter (mock → real) → 4) Raw→staging dbt → 5) Dedupe + rank (stub) → 6) Hyper export → 7) Notifications → 8) Daily schedule.
