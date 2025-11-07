@@ -17,6 +17,7 @@ import logging
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Optional
+from urllib.parse import urlparse, urlunparse
 
 import psycopg2
 import psycopg2.extras
@@ -53,7 +54,9 @@ class NormalizerDB:
         Raises:
             DatabaseError: If connection fails
         """
-        self.connection_string = connection_string
+        # Normalize connection string to ensure host is always specified
+        # This prevents psycopg2 from defaulting to Unix socket
+        self.connection_string = self._normalize_connection_string(connection_string)
         self._conn: Optional[psycopg2.extensions.connection] = None
 
         # Validate connection
@@ -62,6 +65,80 @@ class NormalizerDB:
             logger.info("Database connection validated successfully")
         except Exception as e:
             raise DatabaseError(f"Failed to connect to database: {e}") from e
+
+    def _normalize_connection_string(self, conn_str: str) -> str:
+        """
+        Normalize connection string to ensure host is always specified.
+
+        If the connection string doesn't have a host or has an empty host,
+        psycopg2 will default to Unix socket, which fails in Docker containers.
+
+        Args:
+            conn_str: Original connection string
+
+        Returns:
+            Normalized connection string with host explicitly set
+        """
+        try:
+            parsed = urlparse(conn_str)
+
+            # If no hostname or hostname is empty, default to 'postgres' (Docker service name)
+            if not parsed.hostname:
+                netloc = f"{parsed.username or 'job_etl_user'}"
+                if parsed.password:
+                    netloc += f":{parsed.password}"
+                netloc += "@postgres"
+                if parsed.port:
+                    netloc += f":{parsed.port}"
+                else:
+                    netloc += ":5432"
+
+                normalized = urlunparse((
+                    parsed.scheme,
+                    netloc,
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment
+                ))
+
+                logger.warning(
+                    "Connection string missing host, defaulting to 'postgres'"
+                )
+                return normalized
+
+            # If hostname is 'localhost' or '127.0.0.1', replace with 'postgres' for Docker
+            if parsed.hostname in ('localhost', '127.0.0.1'):
+                netloc = f"{parsed.username or 'job_etl_user'}"
+                if parsed.password:
+                    netloc += f":{parsed.password}"
+                netloc += "@postgres"
+                if parsed.port:
+                    netloc += f":{parsed.port}"
+                else:
+                    netloc += ":5432"
+
+                normalized = urlunparse((
+                    parsed.scheme,
+                    netloc,
+                    parsed.path,
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment
+                ))
+
+                logger.info(
+                    "Replaced localhost with 'postgres' in connection string"
+                )
+                return normalized
+
+            # Connection string looks good, return as-is
+            return conn_str
+        except Exception as e:
+            logger.warning(
+                f"Failed to normalize connection string, using as-is: {e}"
+            )
+            return conn_str
 
     def _test_connection(self) -> None:
         """Test database connection by executing a simple query."""

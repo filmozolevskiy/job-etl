@@ -23,10 +23,10 @@ Add these to your `.env` file (or set as environment variables):
 # Gmail SMTP Configuration
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=filmozolevskiy@gmail.com
-SMTP_FROM=filmozolevskiy@gmail.com
-SMTP_PASSWORD=rkxxnzawzpdriwns
-NOTIFY_TO=anderos691@gmail.com
+SMTP_USER=your-email@gmail.com
+SMTP_FROM=your-email@gmail.com
+SMTP_PASSWORD=your-app-password-here
+NOTIFY_TO=recipient@example.com
 SMTP_USE_TLS=true
 SMTP_USE_SSL=false
 ```
@@ -39,8 +39,8 @@ For better security, store the password in a Docker secret file:
 # Create the directory if it doesn't exist
 mkdir -p secrets/notifications
 
-# Create the secret file
-echo "rkxxnzawzpdriwns" > secrets/notifications/smtp_password.txt
+# Create the secret file (replace with your actual App Password)
+echo "your-app-password-here" > secrets/notifications/smtp_password.txt
 
 # Set permissions (Linux/Mac)
 chmod 600 secrets/notifications/smtp_password.txt
@@ -51,10 +51,10 @@ Then in your `.env` file, **omit** `SMTP_PASSWORD`:
 ```bash
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=filmozolevskiy@gmail.com
-SMTP_FROM=filmozolevskiy@gmail.com
+SMTP_USER=your-email@gmail.com
+SMTP_FROM=your-email@gmail.com
 # SMTP_PASSWORD is read from secrets/notifications/smtp_password.txt
-NOTIFY_TO=anderos691@gmail.com
+NOTIFY_TO=recipient@example.com
 SMTP_USE_TLS=true
 ```
 
@@ -76,7 +76,7 @@ Or trigger the DAG and check if the notification email is sent.
 To send to multiple recipients, use comma-separated emails:
 
 ```bash
-NOTIFY_TO=anderos691@gmail.com,team@example.com,manager@example.com
+NOTIFY_TO=recipient1@example.com,recipient2@example.com,recipient3@example.com
 ```
 
 ## Troubleshooting

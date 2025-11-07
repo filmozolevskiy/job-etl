@@ -35,7 +35,10 @@ WITH staging AS (
         source,
         first_seen_at,
         last_seen_at,
-        apply_url
+        apply_url,
+        -- Compute normalized company name and company_id to match dim_companies
+        -- Handle NULL companies by using 'unknown' as default
+        MD5(LOWER(REGEXP_REPLACE(TRIM(COALESCE(company, 'unknown')), '\s+', ' ', 'g'))) AS company_id_normalized
     FROM {{ source('staging', 'job_postings_stg') }}
 ),
 
@@ -52,7 +55,7 @@ SELECT
     
     -- Dimensions (standardized fields)
     staging.job_title AS job_title_std,  -- Will be enriched later
-    companies.company_id,
+    COALESCE(companies.company_id, staging.company_id_normalized) AS company_id,
     staging.location AS location_std,  -- Will be enriched later
     staging.remote_type,
     staging.contract_type,
@@ -79,6 +82,6 @@ SELECT
     NULL::JSONB AS rank_explain  -- Will be computed by ranker
     
 FROM staging
-LEFT JOIN companies ON staging.company = companies.company
+LEFT JOIN companies ON staging.company_id_normalized = companies.company_id
 ORDER BY staging.first_seen_at DESC
 

@@ -94,9 +94,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      # Connection string will be set in command script to read from secret file
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -149,9 +151,21 @@ services:
       - bash
       - -c
       - |
+        # Read Airflow postgres password from secret file
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
+        # Wait for database initialization
+        echo "Waiting for Airflow database initialization..."
+        until airflow db check; do
+          echo "Database not ready yet. Waiting..."
+          sleep 5
+        done
+        echo "Database is ready!"
+        # Set connection environment variables for application database
         export AIRFLOW_CONN_POSTGRES_DEFAULT="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
         export DATABASE_URL="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
-        exec webserver
+        # Start webserver
+        airflow webserver
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
       interval: 30s
@@ -172,9 +186,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      # Connection string will be set in command script to read from secret file
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -204,6 +220,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     secrets:
       - postgres_password
+      - airflow_postgres_password
       - smtp_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
@@ -218,9 +235,21 @@ services:
       - bash
       - -c
       - |
+        # Read Airflow postgres password from secret file
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
+        # Wait for database initialization
+        echo "Waiting for Airflow database initialization..."
+        until airflow db check; do
+          echo "Database not ready yet. Waiting..."
+          sleep 5
+        done
+        echo "Database is ready!"
+        # Set connection environment variables for application database
         export AIRFLOW_CONN_POSTGRES_DEFAULT="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
         export DATABASE_URL="postgresql://$POSTGRES_USER:$(cat /run/secrets/postgres_password)@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}"
-        exec scheduler
+        # Start scheduler
+        airflow scheduler
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
       interval: 30s
@@ -242,7 +271,7 @@ services:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
+      # Connection string will be set in command script to read from secret file
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -258,6 +287,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     secrets:
       - postgres_password
+      - airflow_postgres_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - ./airflow/plugins:/opt/airflow/plugins:ro
@@ -271,10 +301,43 @@ services:
       - bash
       - -c
       - |
-        airflow db init
-        airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password "$$AIRFLOW_ADMIN_PASSWORD"
-        airflow connections delete postgres_default 2>/dev/null || true
-        airflow connections add 'postgres_default' --conn-type 'postgres' --conn-host 'postgres' --conn-login "$$POSTGRES_USER" --conn-password "$$(cat /run/secrets/postgres_password)" --conn-schema "$$POSTGRES_DB" --conn-port '5432'
+        # Read Airflow postgres password from secret file
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
+        # Wait for database to be ready
+        echo "Waiting for Airflow database to be ready..."
+        until pg_isready -h airflow-postgres -U airflow -d airflow; do
+          echo "Database not ready yet. Waiting..."
+          sleep 2
+        done
+        echo "Database is ready!"
+        # Initialize database (idempotent - safe to run multiple times)
+        echo "Initializing Airflow database..."
+        airflow db init || echo "Database already initialized, skipping..."
+        # Create admin user (idempotent)
+        echo "Creating admin user..."
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password "$$AIRFLOW_ADMIN_PASSWORD" 2>/dev/null || echo "Admin user already exists, skipping..."
+        # Set up postgres_default connection (idempotent)
+        echo "Setting up postgres_default connection..."
+        # Delete connection directly via SQL to avoid FERNET_KEY mismatch issues
+        PGPASSWORD=$$AIRFLOW_POSTGRES_PASSWORD psql -h airflow-postgres -U airflow -d airflow -c "DELETE FROM connection WHERE conn_id = 'postgres_default';" 2>/dev/null || echo "Could not delete old connection (may not exist)"
+        # Wait a moment for the delete to complete
+        sleep 1
+        # Create new connection
+        airflow connections add 'postgres_default' \
+          --conn-type 'postgres' \
+          --conn-host 'postgres' \
+          --conn-login "$$POSTGRES_USER" \
+          --conn-password "$$(cat /run/secrets/postgres_password)" \
+          --conn-schema "$$POSTGRES_DB" \
+          --conn-port '5432' || echo "Connection creation failed, but continuing..."
+        echo "Airflow initialization completed!"
     networks:
       - job-etl-network
 

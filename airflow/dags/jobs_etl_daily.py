@@ -48,6 +48,83 @@ def _get_airflow_var(name: str, default: Optional[str] = None) -> Optional[str]:
         return os.getenv(name, default)
 
 
+def _get_database_url(connection_id: str = 'postgres_default') -> str:
+    """
+    Get database URL from Airflow connection with fallback to environment variables.
+
+    Builds connection string manually to ensure host is included, preventing
+    psycopg2 from defaulting to Unix socket connections.
+
+    Args:
+        connection_id: Airflow connection ID (default: 'postgres_default')
+
+    Returns:
+        PostgreSQL connection string
+
+    Raises:
+        ValueError: If database connection cannot be established
+    """
+    from airflow.hooks.base import BaseHook
+
+    try:
+        conn = BaseHook.get_connection(connection_id)
+        # Build connection string manually to ensure host is included
+        # This prevents psycopg2 from defaulting to Unix socket
+        conn_host = conn.host or 'postgres'
+        conn_port = conn.port or 5432
+        conn_schema = conn.schema or 'job_etl'
+        conn_login = conn.login or 'job_etl_user'
+        conn_password = conn.password or ''
+
+        # If password is empty, try to read from secret file
+        if not conn_password:
+            secret_path = '/run/secrets/postgres_password'
+            if os.path.exists(secret_path):
+                try:
+                    with open(secret_path, encoding='utf-8') as f:
+                        conn_password = f.read().strip()
+                except UnicodeDecodeError:
+                    with open(secret_path, encoding='utf-16') as f:
+                        conn_password = f.read().strip()
+
+        database_url = f"postgresql://{conn_login}:{conn_password}@{conn_host}:{conn_port}/{conn_schema}"
+        print(f"Using Airflow connection: {connection_id} (host: {conn_host})")
+        return database_url
+    except Exception as e:
+        print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
+        # Try DATABASE_URL first
+        database_url = os.getenv('DATABASE_URL')
+        # If not set, build from individual components
+        if not database_url:
+            db_host = os.getenv('POSTGRES_HOST', 'postgres')
+            db_port = os.getenv('POSTGRES_PORT', '5432')
+            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
+            db_password = os.getenv('POSTGRES_PASSWORD')
+            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+
+            # Try to read password from secret file if available
+            if not db_password:
+                secret_path = '/run/secrets/postgres_password'
+                if os.path.exists(secret_path):
+                    try:
+                        with open(secret_path, encoding='utf-8') as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        with open(secret_path, encoding='utf-16') as f:
+                            db_password = f.read().strip()
+
+            if db_password:
+                database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+                print(f"Built DATABASE_URL from environment variables (host: {db_host})")
+            else:
+                raise ValueError(
+                    f"Database password must be configured via Airflow connection '{connection_id}', "
+                    "POSTGRES_PASSWORD environment variable, or /run/secrets/postgres_password file"
+                ) from None
+
+        return database_url
+
+
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
@@ -92,12 +169,24 @@ def run_dbt_models(models: str, **context):
         # Get database credentials from Airflow connection
         try:
             conn = BaseHook.get_connection('postgres_default')
-            db_host = conn.host
-            db_port = conn.port
-            db_user = conn.login
-            db_password = conn.password
-            db_name = conn.schema  # In Airflow connection, schema is the database name
-            print("Using Airflow connection: postgres_default")
+            db_host = conn.host or 'postgres'  # Default to 'postgres' for Docker service name
+            db_port = conn.port or 5432
+            db_user = conn.login or 'job_etl_user'
+            db_password = conn.password or ''
+            db_name = conn.schema or 'job_etl'  # In Airflow connection, schema is the database name
+
+            # If password is empty, try to read from secret file
+            if not db_password:
+                secret_path = '/run/secrets/postgres_password'
+                if os.path.exists(secret_path):
+                    try:
+                        with open(secret_path, encoding='utf-8') as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        with open(secret_path, encoding='utf-16') as f:
+                            db_password = f.read().strip()
+
+            print(f"Using Airflow connection: postgres_default (host: {db_host})")
         except Exception as e:
             print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
             db_host = os.getenv('POSTGRES_HOST', 'postgres')
@@ -234,12 +323,24 @@ def run_dbt_tests(**context):
         # Get database credentials from Airflow connection
         try:
             conn = BaseHook.get_connection('postgres_default')
-            db_host = conn.host
-            db_port = conn.port
-            db_user = conn.login
-            db_password = conn.password
-            db_name = conn.schema  # In Airflow connection, schema is the database name
-            print("Using Airflow connection: postgres_default")
+            db_host = conn.host or 'postgres'  # Default to 'postgres' for Docker service name
+            db_port = conn.port or 5432
+            db_user = conn.login or 'job_etl_user'
+            db_password = conn.password or ''
+            db_name = conn.schema or 'job_etl'  # In Airflow connection, schema is the database name
+
+            # If password is empty, try to read from secret file
+            if not db_password:
+                secret_path = '/run/secrets/postgres_password'
+                if os.path.exists(secret_path):
+                    try:
+                        with open(secret_path, encoding='utf-8') as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        with open(secret_path, encoding='utf-16') as f:
+                            db_password = f.read().strip()
+
+            print(f"Using Airflow connection: postgres_default (host: {db_host})")
         except Exception as e:
             print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
             db_host = os.getenv('POSTGRES_HOST', 'postgres')
@@ -378,44 +479,7 @@ def extract_source_jsearch(**context):
         from services.source_extractor.db_storage import JobStorage
 
         # Resolve database URL from Airflow connection with fallback to env
-        try:
-            conn = BaseHook.get_connection('postgres_default')
-            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
-            print("Using Airflow connection: postgres_default")
-        except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            # Try DATABASE_URL first
-            database_url = os.getenv('DATABASE_URL')
-            # If not set, build from individual components
-            if not database_url:
-                db_host = os.getenv('POSTGRES_HOST', 'postgres')
-                db_port = os.getenv('POSTGRES_PORT', '5432')
-                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-                db_password = os.getenv('POSTGRES_PASSWORD')
-                db_name = os.getenv('POSTGRES_DB', 'job_etl')
-
-                # Try to read password from secret file if available
-                if not db_password:
-                    secret_path = '/run/secrets/postgres_password'
-                    if os.path.exists(secret_path):
-                        try:
-                            # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, encoding='utf-8') as f:
-                                db_password = f.read().strip()
-                        except UnicodeDecodeError:
-                            # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, encoding='utf-16') as f:
-                                db_password = f.read().strip()
-
-                if db_password:
-                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
-                else:
-                    raise ValueError(
-                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                        "or environment variables (DATABASE_URL or POSTGRES_*). "
-                        "Also ensure postgres_password secret is mounted."
-                    ) from None
+        database_url = _get_database_url('postgres_default')
 
         # Resolve API configuration from Airflow Variables with env fallbacks
         jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
@@ -511,44 +575,7 @@ def normalize_data(**context):
         from services.normalizer.main import run_normalizer
 
         # Get database URL from Airflow connection with fallback to env
-        try:
-            conn = BaseHook.get_connection('postgres_default')
-            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
-            print("Using Airflow connection: postgres_default")
-        except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            # Try DATABASE_URL first
-            database_url = os.getenv('DATABASE_URL')
-            # If not set, build from individual components
-            if not database_url:
-                db_host = os.getenv('POSTGRES_HOST', 'postgres')
-                db_port = os.getenv('POSTGRES_PORT', '5432')
-                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-                db_password = os.getenv('POSTGRES_PASSWORD')
-                db_name = os.getenv('POSTGRES_DB', 'job_etl')
-
-                # Try to read password from secret file if available
-                if not db_password:
-                    secret_path = '/run/secrets/postgres_password'
-                    if os.path.exists(secret_path):
-                        try:
-                            # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, encoding='utf-8') as f:
-                                db_password = f.read().strip()
-                        except UnicodeDecodeError:
-                            # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, encoding='utf-16') as f:
-                                db_password = f.read().strip()
-
-                if db_password:
-                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
-                else:
-                    raise ValueError(
-                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                        "or environment variables (DATABASE_URL or POSTGRES_*). "
-                        "Also ensure postgres_password secret is mounted."
-                    ) from None
+        database_url = _get_database_url('postgres_default')
 
         print("Connecting to database...")
 
@@ -671,44 +698,7 @@ def rank_jobs(**context):
         from services.ranker.scoring import calculate_rank
 
         # Get database URL from Airflow connection with fallback to env
-        try:
-            conn = BaseHook.get_connection('postgres_default')
-            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
-            print("Using Airflow connection: postgres_default")
-        except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            # Try DATABASE_URL first
-            database_url = os.getenv('DATABASE_URL')
-            # If not set, build from individual components
-            if not database_url:
-                db_host = os.getenv('POSTGRES_HOST', 'postgres')
-                db_port = os.getenv('POSTGRES_PORT', '5432')
-                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-                db_password = os.getenv('POSTGRES_PASSWORD')
-                db_name = os.getenv('POSTGRES_DB', 'job_etl')
-
-                # Try to read password from secret file if available
-                if not db_password:
-                    secret_path = '/run/secrets/postgres_password'
-                    if os.path.exists(secret_path):
-                        try:
-                            # Try UTF-8 first, then UTF-16 if that fails
-                            with open(secret_path, encoding='utf-8') as f:
-                                db_password = f.read().strip()
-                        except UnicodeDecodeError:
-                            # Fallback to UTF-16 (Windows might create files in UTF-16)
-                            with open(secret_path, encoding='utf-16') as f:
-                                db_password = f.read().strip()
-
-                if db_password:
-                    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-                    print(f"Built DATABASE_URL from environment variables (host: {db_host})")
-                else:
-                    raise ValueError(
-                        "DATABASE_URL must be configured via Airflow connection 'postgres_default' "
-                        "or environment variables (DATABASE_URL or POSTGRES_*). "
-                        "Also ensure postgres_password secret is mounted."
-                    ) from None
+        database_url = _get_database_url('postgres_default')
 
         print("Loading ranking configuration...")
         config = load_ranking_config()
@@ -812,41 +802,7 @@ def publish_to_tableau(**context):
         from services.publisher_hyper.exporter import export_from_env
 
         # Get database URL for export
-        try:
-            from airflow.hooks.base import BaseHook
-            conn = BaseHook.get_connection('postgres_default')
-            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
-            print("Using Airflow connection: postgres_default")
-        except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            # Try DATABASE_URL first
-            database_url = os.getenv('DATABASE_URL')
-            if not database_url:
-                # Build from individual components
-                db_host = os.getenv('POSTGRES_HOST', 'postgres')
-                db_port = os.getenv('POSTGRES_PORT', '5432')
-                db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-                db_password = os.getenv('POSTGRES_PASSWORD')
-                db_name = os.getenv('POSTGRES_DB', 'job_etl')
-
-                # Try to read password from secret file if available
-                if not db_password:
-                    secret_path = '/run/secrets/postgres_password'
-                    if os.path.exists(secret_path):
-                        try:
-                            with open(secret_path, encoding='utf-8') as f:
-                                db_password = f.read().strip()
-                        except UnicodeDecodeError:
-                            with open(secret_path, encoding='utf-16') as f:
-                                db_password = f.read().strip()
-
-                if not db_password:
-                    raise ValueError(
-                        "Database password must be configured via Airflow connection 'postgres_default', "
-                        "POSTGRES_PASSWORD environment variable, or /run/secrets/postgres_password file"
-                    ) from None
-
-                database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        database_url = _get_database_url('postgres_default')
 
         # Set DATABASE_URL for export_from_env
         os.environ['DATABASE_URL'] = database_url
@@ -903,9 +859,35 @@ def send_notification_email(**context):
             end_time = datetime.now(tz=timezone.utc)
         duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
 
-        # Determine overall status
-        dag_state = dag_run.state
-        is_success = dag_state == 'success'
+        # Collect task instances to determine overall status
+        # Check actual task states rather than DAG run state, since DAG run state
+        # might not be final when notification runs (especially with trigger_rule="all_done")
+        task_instances = dag_run.get_task_instances()
+        failed_tasks = []
+        skipped_tasks = []
+        running_tasks = []
+
+        for task_instance in task_instances:
+            # Skip the notification task itself and the end dummy task
+            if task_instance.task_id in ['notify_daily', 'end']:
+                continue
+
+            if task_instance.state == 'failed':
+                failed_tasks.append(task_instance.task_id)
+            elif task_instance.state == 'skipped':
+                skipped_tasks.append(task_instance.task_id)
+            elif task_instance.state in ['running', 'queued', 'up_for_retry', 'up_for_reschedule']:
+                running_tasks.append(task_instance.task_id)
+
+        # Determine overall status: success if no failed tasks
+        # Note: We consider skipped tasks as acceptable (e.g., conditional tasks)
+        is_success = len(failed_tasks) == 0
+
+        print("DAG Status Check:")
+        print(f"  - Failed tasks: {failed_tasks}")
+        print(f"  - Skipped tasks: {skipped_tasks}")
+        print(f"  - Running/queued tasks: {running_tasks}")
+        print(f"  - Overall status: {'SUCCESS' if is_success else 'FAILED'}")
 
         # Collect counts from XCom
         extract_result = ti.xcom_pull(task_ids='extract_jsearch', default={})
@@ -920,15 +902,11 @@ def send_notification_email(**context):
 
         # Get database connection for queries
         try:
-            conn = BaseHook.get_connection('postgres_default')
-            database_url = conn.get_uri().replace('postgres://', 'postgresql://')
-            print("Using Airflow connection: postgres_default")
+            database_url = _get_database_url('postgres_default')
         except Exception as e:
-            print(f"Warning: Could not get Airflow connection, trying environment variable: {e}")
-            database_url = os.getenv('DATABASE_URL')
-            if not database_url:
-                print("Warning: DATABASE_URL not configured, skipping database queries")
-                database_url = None
+            print(f"Warning: Could not get database connection: {e}")
+            print("Warning: DATABASE_URL not configured, skipping database queries")
+            database_url = None
 
         # Query top ranked jobs and get counts
         top_matches = []
@@ -1014,13 +992,6 @@ def send_notification_email(**context):
             except Exception as e:
                 print(f"Warning: Failed to query database for top matches: {e}")
                 print("Continuing with email notification without database data")
-
-        # Collect failed tasks
-        failed_tasks = []
-        if not is_success:
-            for task_instance in dag_run.get_task_instances():
-                if task_instance.state == 'failed':
-                    failed_tasks.append(task_instance.task_id)
 
         # Build payload
         payload = {

@@ -20,29 +20,45 @@
 
 WITH staging_jobs AS (
     SELECT DISTINCT
-        company,
+        COALESCE(company, 'unknown') AS company,
         company_size,
         source,
         first_seen_at
     FROM {{ source('staging', 'job_postings_stg') }}
-    WHERE company IS NOT NULL
 ),
 
-company_ranked AS (
+-- Normalize company names and create company_id upfront
+companies_with_id AS (
     SELECT
         company,
         company_size,
         source,
         first_seen_at,
+        -- Generate company_id from normalized name (this ensures uniqueness)
+        MD5(LOWER({{ normalize_ws('company') }})) AS company_id
+    FROM staging_jobs
+),
+
+-- Deduplicate by company_id (normalized name) to ensure uniqueness
+-- This handles cases where different raw names normalize to the same value
+company_ranked AS (
+    SELECT
+        company_id,
+        company,
+        company_size,
+        source,
+        first_seen_at,
         ROW_NUMBER() OVER (
-            PARTITION BY company 
+            PARTITION BY company_id 
             ORDER BY first_seen_at ASC
         ) AS rn
-    FROM staging_jobs
+    FROM companies_with_id
 ),
 
 deduped AS (
     SELECT
+        company_id,
+        -- Take the first company name seen (raw value for display)
         company,
         company_size,
         source AS source_first_seen,
@@ -52,8 +68,8 @@ deduped AS (
 )
 
 SELECT
-    -- Surrogate key (using hash of normalized company name)
-    MD5(LOWER({{ normalize_ws('deduped.company') }})) AS company_id,
+    -- Surrogate key (already computed and deduped)
+    deduped.company_id,
     
     -- Natural attributes
     deduped.company,
