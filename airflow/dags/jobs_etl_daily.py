@@ -1064,11 +1064,15 @@ def send_notification_email(**context):
 
         text_body = "\n".join(lines)
 
-        # HTML body (optional)
+        # HTML body (optional) - escape user data for security
+        from html import escape
         html_rows = "".join(
-            f"<tr><td>{j['title']}</td><td>{j['company']}</td><td>{j['location']}</td><td>{j['score']:.2f}</td>"
-            f"<td><a href='{j['apply_url']}'>Apply</a></td></tr>" for j in top_matches[:25]
+            f"<tr><td>{escape(str(j['title'] or ''))}</td><td>{escape(str(j['company'] or ''))}</td>"
+            f"<td>{escape(str(j['location'] or ''))}</td><td>{j['score']:.2f}</td>"
+            f"<td><a href='{escape(str(j['apply_url'] or ''))}'>Apply</a></td></tr>"
+            for j in top_matches[:25]
         )
+        failed_tasks_escaped = ', '.join(escape(t) for t in failed_tasks) if failed_tasks else ''
         html_body = f"""
         <h3>Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'}</h3>
         <p><strong>Duration:</strong> {duration_sec}s</p>
@@ -1080,7 +1084,7 @@ def send_notification_email(**context):
           <li>ranked: {ranked_count}</li>
           <li>new_top_matches: {len(top_matches)}</li>
         </ul>
-        {('<p><strong>Failed tasks:</strong> ' + ', '.join(failed_tasks) + '</p>') if failed_tasks else ''}
+        {f'<p><strong>Failed tasks:</strong> {failed_tasks_escaped}</p>' if failed_tasks else ''}
         <table border="1" cellpadding="4" cellspacing="0">
           <thead><tr><th>Title</th><th>Company</th><th>Location</th><th>Score</th><th>Link</th></tr></thead>
           <tbody>{html_rows}</tbody>

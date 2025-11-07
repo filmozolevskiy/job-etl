@@ -17,9 +17,8 @@ import sys
 
 from dotenv import load_dotenv
 
-from .base import Notifier, NotificationMessage
+from .base import NotificationMessage, Notifier
 from .email import EmailChannel
-
 
 load_dotenv()
 
@@ -31,6 +30,20 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parse command-line arguments for the notifier CLI.
+
+    Returns:
+        argparse.Namespace: Parsed command-line arguments with the following attributes:
+            - subject (str): Notification subject line (required)
+            - text (str): Plain text message body (required)
+            - html (str, optional): HTML message body
+            - metadata (str, optional): JSON string containing additional context
+            - verbose (bool): Enable debug-level logging
+
+    Raises:
+        SystemExit: If required arguments are missing or invalid.
+    """
     parser = argparse.ArgumentParser(
         description='Send a notification via configured channels.'
     )
@@ -43,6 +56,20 @@ def parse_args() -> argparse.Namespace:
 
 
 def build_notifier() -> Notifier:
+    """
+    Build and configure a Notifier instance with available channels.
+
+    Currently configures EmailChannel with SMTP settings from environment
+    variables. The EmailChannel constructor will raise ValueError if required
+    SMTP configuration is missing.
+
+    Returns:
+        Notifier: Configured notifier instance with email channel enabled.
+
+    Raises:
+        ValueError: If SMTP configuration is incomplete (missing SMTP_HOST,
+            SMTP_FROM, or NOTIFY_TO).
+    """
     channels = []
     # Always enable EmailChannel if SMTP is configured; raise early if not.
     channels.append(EmailChannel())
@@ -50,12 +77,28 @@ def build_notifier() -> Notifier:
 
 
 def main() -> int:
+    """
+    Main entry point for the notifier CLI.
+
+    Parses command-line arguments, builds a notifier instance, creates a
+    notification message, and sends it through all configured channels.
+
+    Returns:
+        int: Exit code (0 for success, 2 for failure).
+
+    Side Effects:
+        - Sends notification via configured channels (e.g., email)
+        - Logs success or failure messages
+    """
     args = parse_args()
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     try:
+        # Build notifier with configured channels
         notifier = build_notifier()
+
+        # Parse optional metadata JSON
         metadata = None
         if args.metadata:
             try:
@@ -63,6 +106,7 @@ def main() -> int:
             except json.JSONDecodeError:
                 logger.warning('Invalid JSON for --metadata; ignoring')
 
+        # Create notification message
         message = NotificationMessage(
             subject=args.subject,
             text=args.text,
@@ -70,6 +114,7 @@ def main() -> int:
             metadata=metadata,
         )
 
+        # Send notification through all channels
         notifier.notify(message)
         logger.info('Notification sent')
         return 0

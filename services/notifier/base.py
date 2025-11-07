@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Protocol, Any
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any, Protocol
 
 
 @dataclass
@@ -41,7 +41,33 @@ class Notifier:
         self._channels = list(channels)
 
     def notify(self, message: NotificationMessage) -> None:
+        """
+        Send a notification message through all configured channels.
+
+        Iterates through all registered channels and sends the message via each.
+        If one channel fails, the error is logged and processing continues to
+        the next channel, allowing partial success in multi-channel scenarios.
+
+        Args:
+            message: The notification message to send.
+
+        Note:
+            Failures in individual channels are logged but do not stop processing
+            of other channels. This allows notifications to be sent through
+            multiple channels even if one fails.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
         for channel in self._channels:
-            channel.send(message)
+            try:
+                channel.send(message)
+            except Exception as e:
+                channel_name = channel.__class__.__name__
+                logger.error(
+                    f"Channel {channel_name} failed to send notification: {e}",
+                    exc_info=True
+                )
+                # Continue to next channel instead of raising
 
 
