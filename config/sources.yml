@@ -1,0 +1,10 @@
+providers:
+  jsearch:
+    enabled: true
+    adapter: "services.source_extractor.adapters.jsearch_adapter.JSearchAdapter"
+    params:
+      query: "analytics engineer"
+      location: "Canada"
+      date_posted: "month"
+      max_jobs: 25
+

@@ -454,6 +454,7 @@ def extract_source_jsearch(**context):
 
     This will:
     - Call the source-extractor service (via DockerOperator)
+    - Read provider configuration from config/sources.yml
     - Pass API credentials from Airflow Variables/Connections
     - Store raw JSON to raw.job_postings_raw table
     - Return count of extracted jobs
@@ -477,20 +478,44 @@ def extract_source_jsearch(**context):
             JSearchAdapter,
         )
         from services.source_extractor.db_storage import JobStorage
+        from services.source_extractor.source_config import load_sources_config
 
         # Resolve database URL from Airflow connection with fallback to env
         database_url = _get_database_url('postgres_default')
 
+        # Load provider configuration (non-secret params)
+        config = load_sources_config()
+        provider_config = config.get("jsearch")
+        if not provider_config:
+            raise ValueError("Provider 'jsearch' is missing in config/sources.yml")
+        if not provider_config.enabled:
+            print("Provider 'jsearch' is disabled in config/sources.yml; skipping extraction")
+            return {"source": "jsearch", "extracted_count": 0}
+
         # Resolve API configuration from Airflow Variables with env fallbacks
         jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
         jsearch_base_url = _get_airflow_var('JSEARCH_BASE_URL', 'https://api.openwebninja.com')
-        jsearch_query = _get_airflow_var('JSEARCH_QUERY', 'analytics engineer')
-        jsearch_location = _get_airflow_var('JSEARCH_LOCATION', 'United States')
-        jsearch_date_posted = _get_airflow_var('JSEARCH_DATE_POSTED', 'month')
+        config_params = provider_config.params
+
+        jsearch_query = _get_airflow_var(
+            'JSEARCH_QUERY', config_params.get('query', 'analytics engineer')
+        )
+        jsearch_location = _get_airflow_var(
+            'JSEARCH_LOCATION', config_params.get('location', 'United States')
+        )
+        jsearch_date_posted = _get_airflow_var(
+            'JSEARCH_DATE_POSTED', config_params.get('date_posted', 'month')
+        )
+
         try:
-            jsearch_max_jobs = int(_get_airflow_var('JSEARCH_MAX_JOBS', '20') or '20')
+            jsearch_max_jobs = int(
+                _get_airflow_var(
+                    'JSEARCH_MAX_JOBS', str(config_params.get('max_jobs', '20'))
+                )
+                or '20'
+            )
         except ValueError:
-            jsearch_max_jobs = 20
+            jsearch_max_jobs = int(config_params.get('max_jobs', 20))
 
         if not jsearch_api_key:
             raise ValueError(

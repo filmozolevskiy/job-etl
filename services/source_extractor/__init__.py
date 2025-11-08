@@ -10,7 +10,8 @@ Main components:
 """
 
 from .base import JobPostingRaw, SourceAdapter
+from .source_config import ProviderConfig, load_sources_config
 
-__all__ = ["SourceAdapter", "JobPostingRaw"]
+__all__ = ["SourceAdapter", "JobPostingRaw", "ProviderConfig", "load_sources_config"]
 __version__ = "0.1.0"
 
