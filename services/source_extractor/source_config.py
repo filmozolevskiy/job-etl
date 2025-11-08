@@ -9,9 +9,10 @@ should use this helper to keep configuration handling consistent.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any
 
 import yaml
 
@@ -24,7 +25,7 @@ class ProviderConfig:
 
     adapter: str
     enabled: bool = True
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
 
 
 def _project_root() -> Path:
@@ -32,7 +33,7 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent
 
 
-def load_sources_config(config_path: Optional[str] = None) -> Dict[str, ProviderConfig]:
+def load_sources_config(config_path: str | None = None) -> dict[str, ProviderConfig]:
     """
     Load provider configuration from YAML file.
 
@@ -54,7 +55,7 @@ def load_sources_config(config_path: Optional[str] = None) -> Dict[str, Provider
 
     try:
         with path.open("r", encoding="utf-8") as handle:
-            raw_config: Optional[Mapping[str, Any]] = yaml.safe_load(handle)
+            raw_config: Mapping[str, Any] | None = yaml.safe_load(handle)
     except yaml.YAMLError as exc:
         logger.error("Failed to parse sources configuration: %s", exc)
         raise ValueError(f"Invalid YAML in sources configuration: {exc}") from exc
@@ -67,7 +68,7 @@ def load_sources_config(config_path: Optional[str] = None) -> Dict[str, Provider
     if not isinstance(providers_section, Mapping):
         raise ValueError("`providers` section is missing or invalid in sources configuration")
 
-    providers: Dict[str, ProviderConfig] = {}
+    providers: dict[str, ProviderConfig] = {}
     for provider_name, provider_data in providers_section.items():
         if not isinstance(provider_data, Mapping):
             raise ValueError(f"Invalid provider configuration for '{provider_name}'")
