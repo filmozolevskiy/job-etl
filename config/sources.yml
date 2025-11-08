@@ -6,5 +6,5 @@ providers:
       query: "analytics engineer"
       location: "Canada"
       date_posted: "month"
-      max_jobs: 25
+      max_jobs: 100
 
