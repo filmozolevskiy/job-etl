@@ -12,8 +12,8 @@ weights:
   company_size: 0.04
 
 profile:
-  title_keywords: ["data engineer", "analytics engineer", "etl", "airflow", "dbt"]
-  must_have_skills: ["sql", "python", "looker"]
+  title_keywords: ["data engineer", "analytics engineer", "data specialist", "etl" ]
+  must_have_skills: ["sql", "python", "looker", "airflow", "dbt"]
   nice_to_have_skills: ["airflow", "dbt", "aws", "docker"]
   location_home: "Montreal, QC, CA"
   location_radius_km: 50
