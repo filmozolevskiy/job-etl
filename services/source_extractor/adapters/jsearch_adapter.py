@@ -399,7 +399,7 @@ class JSearchAdapter(SourceAdapter):
         return common_data
 
     @staticmethod
-    def _build_location_tokens(location: str | None) -> set[str]:
+    def _build_location_tokens(location: Optional[str]) -> set[str]:
         if not location:
             return set()
         normalized = location.strip().lower()
@@ -442,7 +442,7 @@ class JSearchAdapter(SourceAdapter):
 
         return False
 
-    def _canonicalize_location_query(self, location: str | None) -> Optional[str]:
+    def _canonicalize_location_query(self, location: Optional[str]) -> Optional[str]:
         if not location:
             return None
         normalized = location.strip().lower()
