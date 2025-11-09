@@ -1133,7 +1133,7 @@ with DAG(
     default_args=default_args,
     description="Daily ETL pipeline for job postings with ranking and Tableau export",
     schedule_interval="0 7 * * *",  # Daily at 07:00 (cron format)
-    start_date=datetime(2025, 10, 1, tzinfo=TZ),
+    start_date=pendulum.datetime(2025, 10, 1, tz=TZ),
     catchup=False,  # Don't backfill for past dates
     max_active_runs=1,  # Only one run at a time
     tags=["etl", "jobs", "daily", "production"],
