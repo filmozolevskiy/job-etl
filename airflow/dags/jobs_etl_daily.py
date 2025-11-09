@@ -14,7 +14,7 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 
 Schedule: Daily at 07:00 America/Toronto
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from typing import Optional
 
@@ -858,7 +858,6 @@ def send_notification_email(**context):
     import os
     import sys
     import json
-    from datetime import datetime, timezone
     from airflow.hooks.base import BaseHook
     from airflow.models import TaskInstance
 
