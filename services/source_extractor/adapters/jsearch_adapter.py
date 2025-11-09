@@ -27,6 +27,26 @@ DEFAULT_QUERY = "analytics engineer"
 DEFAULT_LOCATION = "United States"
 DEFAULT_DATE_POSTED = "month"
 
+LOCATION_ALIASES = {
+    "canada": {"canada", "ca"},
+    "ca": {"canada", "ca"},
+    "united states": {"united states", "usa", "us"},
+    "us": {"united states", "usa", "us"},
+    "usa": {"united states", "usa", "us"},
+    "united kingdom": {"united kingdom", "uk"},
+    "uk": {"united kingdom", "uk"},
+}
+
+LOCATION_QUERY_MAP = {
+    "canada": "CA",
+    "ca": "CA",
+    "united states": "US",
+    "us": "US",
+    "usa": "US",
+    "united kingdom": "UK",
+    "uk": "UK",
+}
+
 
 class JSearchAdapter(SourceAdapter):
     """
@@ -69,7 +89,9 @@ class JSearchAdapter(SourceAdapter):
         self.max_jobs = max_jobs
         self.query = query
         self.location = location
+        self.location_query = self._canonicalize_location_query(location)
         self.date_posted = date_posted
+        self._location_tokens = self._build_location_tokens(location)
 
         # Validate API key
         if not self.api_key:
@@ -183,7 +205,7 @@ class JSearchAdapter(SourceAdapter):
         # Build search parameters from configuration
         params = {
             "query": self.query,
-            "location": self.location,
+            "location": self.location_query or self.location,
             "page": current_page,
             "num_pages": 1,  # Fetch one page at a time
             "date_posted": self.date_posted,
@@ -205,14 +227,42 @@ class JSearchAdapter(SourceAdapter):
 
             # Extract job data
             jobs_data = response_data.get("data", [])
-
             if not jobs_data:
                 logger.warning("No jobs returned from API")
                 return [], None
 
+            filtered_jobs_data = [
+                job for job in jobs_data if self._matches_location(job)
+            ]
+            filtered_out = len(jobs_data) - len(filtered_jobs_data)
+            if filtered_out:
+                logger.info(
+                    "Filtered jobs outside target location",
+                    extra={
+                        "requested_location": self.location,
+                        "requested_location_query": params["location"],
+                        "filtered_out": filtered_out,
+                        "page": current_page,
+                    },
+                )
+
+            if not filtered_jobs_data:
+                next_page = None
+                if self.total_jobs_fetched < self.max_jobs and jobs_data:
+                    next_page = str(current_page + 1)
+                logger.warning(
+                    "No jobs matched location filter",
+                    extra={
+                        "requested_location": self.location,
+                        "requested_location_query": params["location"],
+                        "page": current_page,
+                    },
+                )
+                return [], next_page
+
             # Convert to JobPostingRaw objects
             jobs = []
-            for job_data in jobs_data:
+            for job_data in filtered_jobs_data:
                 job = JobPostingRaw(
                     source=self.source_name,
                     payload=job_data,
@@ -347,6 +397,63 @@ class JSearchAdapter(SourceAdapter):
             )
 
         return common_data
+
+    @staticmethod
+    def _build_location_tokens(location: str | None) -> set[str]:
+        if not location:
+            return set()
+        normalized = location.strip().lower()
+        if not normalized:
+            return set()
+
+        tokens = {normalized, normalized.replace(" ", "")}
+        aliases = LOCATION_ALIASES.get(normalized, set())
+        tokens.update(alias.strip().lower() for alias in aliases)
+        if len(normalized) == 2:
+            tokens.add(normalized.upper())
+        return {token for token in tokens if token}
+
+    def _matches_location(self, job_data: dict[str, Any]) -> bool:
+        if not self._location_tokens:
+            return True
+
+        def normalize(value: Any) -> str:
+            if not isinstance(value, str):
+                return ""
+            return value.strip().lower()
+
+        candidate_fields = [
+            normalize(job_data.get("job_country")),
+            normalize(job_data.get("job_country_code")),
+            normalize(job_data.get("job_state")),
+            normalize(job_data.get("job_location")),
+            normalize(job_data.get("job_city")),
+        ]
+
+        candidate_fields.extend(
+            field.replace(" ", "") for field in candidate_fields if field
+        )
+
+        if any(field in self._location_tokens for field in candidate_fields if field):
+            return True
+
+        if job_data.get("job_is_remote"):
+            return "remote" in self._location_tokens
+
+        return False
+
+    def _canonicalize_location_query(self, location: str | None) -> Optional[str]:
+        if not location:
+            return None
+        normalized = location.strip().lower()
+        if not normalized:
+            return None
+        canonical = LOCATION_QUERY_MAP.get(normalized)
+        if canonical:
+            return canonical
+        if len(normalized) == 2:
+            return normalized.upper()
+        return None
 
     def __repr__(self) -> str:
         """String representation of the adapter."""
