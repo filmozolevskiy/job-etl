@@ -4,7 +4,7 @@ providers:
     adapter: "services.source_extractor.adapters.jsearch_adapter.JSearchAdapter"
     params:
       query: "analytics engineer"
-      location: "Canada"
-      date_posted: "month"
-      max_jobs: 100
+      location: "ca"
+      date_posted: "week"
+      max_jobs: 20
 

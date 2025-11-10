@@ -28,13 +28,13 @@ DEFAULT_LOCATION = "United States"
 DEFAULT_DATE_POSTED = "month"
 
 LOCATION_QUERY_MAP: dict[str, str] = {
-    "canada": "CA",
-    "ca": "CA",
-    "united states": "US",
-    "us": "US",
-    "usa": "US",
-    "united kingdom": "UK",
-    "uk": "UK",
+    "canada": "ca",
+    "CA": "ca",
+    "united states": "us",
+    "US": "us",
+    "usa": "us",
+    "united kingdom": "uk",
+    "UK": "uk",
 }
 
 
