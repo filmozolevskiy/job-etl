@@ -145,6 +145,7 @@ class TestJSearchAdapterFetch:
 
         assert "jsearch/search" in call_args[0][0]
         assert call_args[1]["params"]["query"] == "analytics engineer"
+        assert call_args[1]["params"]["location"] == "US"
         assert call_args[1]["params"]["page"] == 1
         assert call_args[1]["headers"]["X-API-Key"] == "test-key"
 
@@ -195,6 +196,20 @@ class TestJSearchAdapterFetch:
         # Should return 2 jobs but no next page (reached limit)
         assert len(jobs) == 2
         assert next_page is None  # No more pages
+
+    @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
+    def test_fetch_normalizes_location_to_country_code(self, mock_get):
+        """Location values are converted to 2-letter country codes when possible."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = SAMPLE_JSEARCH_RESPONSE
+        mock_get.return_value = mock_response
+
+        adapter = JSearchAdapter(api_key="test-key", location="Canada")
+        adapter.fetch()
+
+        call_args = mock_get.call_args
+        assert call_args[1]["params"]["location"] == "CA"
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
     def test_fetch_empty_response(self, mock_get):

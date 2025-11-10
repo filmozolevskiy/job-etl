@@ -27,6 +27,16 @@ DEFAULT_QUERY = "analytics engineer"
 DEFAULT_LOCATION = "United States"
 DEFAULT_DATE_POSTED = "month"
 
+LOCATION_QUERY_MAP: dict[str, str] = {
+    "canada": "CA",
+    "ca": "CA",
+    "united states": "US",
+    "us": "US",
+    "usa": "US",
+    "united kingdom": "UK",
+    "uk": "UK",
+}
+
 
 class JSearchAdapter(SourceAdapter):
     """
@@ -69,6 +79,7 @@ class JSearchAdapter(SourceAdapter):
         self.max_jobs = max_jobs
         self.query = query
         self.location = location
+        self.location_query = self._canonicalize_location_query(location)
         self.date_posted = date_posted
 
         # Validate API key
@@ -183,7 +194,7 @@ class JSearchAdapter(SourceAdapter):
         # Build search parameters from configuration
         params = {
             "query": self.query,
-            "location": self.location,
+            "location": self.location_query or self.location,
             "page": current_page,
             "num_pages": 1,  # Fetch one page at a time
             "date_posted": self.date_posted,
@@ -244,6 +255,17 @@ class JSearchAdapter(SourceAdapter):
         )
 
         return jobs, next_page
+
+    @staticmethod
+    def _canonicalize_location_query(location: Optional[str]) -> Optional[str]:
+        if not location:
+            return None
+        normalized = location.strip().lower()
+        if not normalized:
+            return None
+        if len(normalized) == 2:
+            return normalized.upper()
+        return LOCATION_QUERY_MAP.get(normalized)
 
     def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """
