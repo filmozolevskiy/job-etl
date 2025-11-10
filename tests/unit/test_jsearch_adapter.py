@@ -519,6 +519,7 @@ class TestJSearchAdapterEdgeCases:
                     "job_id": "minimal-job",
                     "job_title": "Test Job",
                     "employer_name": "Test Company",
+                    "job_country": "US",
                     # All other fields missing
                 }
             ]

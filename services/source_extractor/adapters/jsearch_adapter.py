@@ -188,7 +188,6 @@ class JSearchAdapter(SourceAdapter):
             "num_pages": 1,  # Fetch one page at a time
             "date_posted": self.date_posted,
         }
-
         logger.info(
             "Fetching jobs from JSearch",
             extra={
@@ -200,48 +199,7 @@ class JSearchAdapter(SourceAdapter):
         )
 
         try:
-            # Make API call
             response_data = self._make_api_call("jsearch/search", params)
-
-            # Extract job data
-            jobs_data = response_data.get("data", [])
-
-            if not jobs_data:
-                logger.warning("No jobs returned from API")
-                return [], None
-
-            # Convert to JobPostingRaw objects
-            jobs = []
-            for job_data in jobs_data:
-                job = JobPostingRaw(
-                    source=self.source_name,
-                    payload=job_data,
-                    provider_job_id=job_data.get("job_id"),
-                )
-                jobs.append(job)
-
-            # Update cumulative count
-            self.total_jobs_fetched += len(jobs)
-
-            # Determine next page token
-            # Continue pagination until we reach max_jobs or no more results
-            next_page = None
-            if self.total_jobs_fetched < self.max_jobs and jobs_data:
-                next_page = str(current_page + 1)
-
-            logger.info(
-                "Successfully fetched jobs",
-                extra={
-                    "page": current_page,
-                    "jobs_in_page": len(jobs),
-                    "total_fetched_so_far": self.total_jobs_fetched,
-                    "has_next_page": next_page is not None,
-                    "total_api_calls": self.api_call_count,
-                },
-            )
-
-            return jobs, next_page
-
         except requests.exceptions.RequestException as e:
             logger.error(
                 "Failed to fetch jobs from JSearch",
@@ -252,6 +210,40 @@ class JSearchAdapter(SourceAdapter):
                 },
             )
             raise
+
+        jobs_data = response_data.get("data", [])
+
+        if not jobs_data:
+            logger.warning("No jobs returned from API")
+            return [], None
+
+        jobs = []
+        for job_data in jobs_data:
+            job = JobPostingRaw(
+                source=self.source_name,
+                payload=job_data,
+                provider_job_id=job_data.get("job_id"),
+            )
+            jobs.append(job)
+
+        self.total_jobs_fetched += len(jobs)
+
+        next_page = None
+        if self.total_jobs_fetched < self.max_jobs and jobs_data:
+            next_page = str(current_page + 1)
+
+        logger.info(
+            "Successfully fetched jobs",
+            extra={
+                "page": current_page,
+                "jobs_in_page": len(jobs),
+                "total_fetched_so_far": self.total_jobs_fetched,
+                "has_next_page": next_page is not None,
+                "total_api_calls": self.api_call_count,
+            },
+        )
+
+        return jobs, next_page
 
     def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """
