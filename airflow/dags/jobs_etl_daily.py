@@ -875,12 +875,12 @@ def send_notification_email(**context):
         ti: TaskInstance = context['ti']
         dag_run = context['dag_run']
 
-        # Calculate duration
+        # Calculate duration with timezone awareness
         start_time = dag_run.start_date
-        if start_time and start_time.tzinfo:
-            end_time = datetime.now(tz=start_time.tzinfo)
-        else:
-            end_time = datetime.now(tz=timezone.utc)
+        if start_time:
+            start_time = pendulum.instance(start_time)
+            start_time = start_time.in_timezone(TZ)
+        end_time = pendulum.now(TZ)
         duration_sec = int((end_time - start_time).total_seconds()) if start_time else 0
 
         # Collect task instances to determine overall status
@@ -936,6 +936,13 @@ def send_notification_email(**context):
         top_matches = []
         deduped_unique_count = 0
 
+        execution_date = dag_run.execution_date
+        execution_date_local = (
+            pendulum.instance(execution_date).in_timezone(TZ)
+            if execution_date
+            else None
+        )
+
         if database_url:
             try:
                 import psycopg2
@@ -951,11 +958,15 @@ def send_notification_email(**context):
                         deduped_unique_count = cur.fetchone()['count'] or 0
 
                         # Get top 25 ranked jobs filtered to current run timeframe
-                        execution_date = dag_run.execution_date
-                        if execution_date:
-                            filter_time = execution_date - timedelta(hours=1)
-                            print(f"Filtering top matches for jobs ingested since: {filter_time}")
-                            cur.execute("""
+                        if execution_date_local:
+                            filter_time_local = execution_date_local.subtract(hours=1)
+                            filter_time_utc = filter_time_local.in_timezone("UTC")
+                            print(
+                                "Filtering top matches for jobs ingested since: "
+                                f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name}"
+                            )
+                            cur.execute(
+                                """
                                 SELECT
                                     f.job_title_std as title,
                                     d.company,
@@ -968,40 +979,51 @@ def send_notification_email(**context):
                                   AND f.ingested_at >= %s
                                 ORDER BY f.rank_score DESC, f.ingested_at DESC
                                 LIMIT 25
-                            """, (filter_time,))
+                                """,
+                                (filter_time_utc,),
+                            )
+                        elif dag_run.start_date:
+                            start_local = pendulum.instance(dag_run.start_date).in_timezone(TZ)
+                            filter_time_local = start_local.subtract(hours=24)
+                            filter_time_utc = filter_time_local.in_timezone("UTC")
+                            print(
+                                "Using fallback: filtering jobs since: "
+                                f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} (24h before start)"
+                            )
+                            cur.execute(
+                                """
+                                SELECT
+                                    f.job_title_std as title,
+                                    d.company,
+                                    f.location_std as location,
+                                    f.rank_score as score,
+                                    f.apply_url
+                                FROM marts.fact_jobs f
+                                LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                WHERE f.rank_score IS NOT NULL
+                                  AND f.ingested_at >= %s
+                                ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                LIMIT 25
+                                """,
+                                (filter_time_utc,),
+                            )
                         else:
-                            if dag_run.start_date:
-                                filter_time = dag_run.start_date - timedelta(hours=24)
-                                print(f"Using fallback: filtering jobs since: {filter_time} (24h before start)")
-                                cur.execute("""
-                                    SELECT
-                                        f.job_title_std as title,
-                                        d.company,
-                                        f.location_std as location,
-                                        f.rank_score as score,
-                                        f.apply_url
-                                    FROM marts.fact_jobs f
-                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
-                                    WHERE f.rank_score IS NOT NULL
-                                      AND f.ingested_at >= %s
-                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
-                                    LIMIT 25
-                                """, (filter_time,))
-                            else:
-                                print("Warning: No execution_date or start_date; fetching top 25 without time filter")
-                                cur.execute("""
-                                    SELECT
-                                        f.job_title_std as title,
-                                        d.company,
-                                        f.location_std as location,
-                                        f.rank_score as score,
-                                        f.apply_url
-                                    FROM marts.fact_jobs f
-                                    LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
-                                    WHERE f.rank_score IS NOT NULL
-                                    ORDER BY f.rank_score DESC, f.ingested_at DESC
-                                    LIMIT 25
-                                """)
+                            print("Warning: No execution_date or start_date; fetching top 25 without time filter")
+                            cur.execute(
+                                """
+                                SELECT
+                                    f.job_title_std as title,
+                                    d.company,
+                                    f.location_std as location,
+                                    f.rank_score as score,
+                                    f.apply_url
+                                FROM marts.fact_jobs f
+                                LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id
+                                WHERE f.rank_score IS NOT NULL
+                                ORDER BY f.rank_score DESC, f.ingested_at DESC
+                                LIMIT 25
+                                """
+                            )
                         top_jobs = cur.fetchall()
 
                         for job in top_jobs:
@@ -1035,9 +1057,17 @@ def send_notification_email(**context):
         }
 
         # Prepare email content
-        subject = f"Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'} (run_id={dag_run.run_id})"
+        execution_label = (
+            execution_date_local.format("YYYY-MM-DD HH:mm:ss z")
+            if execution_date_local
+            else dag_run.run_id
+        )
+        subject = f"Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'} ({execution_label})"
         lines = [
             f"Status: {'SUCCESS' if is_success else 'FAILED'}",
+            f"Execution (ET): {execution_label}",
+            f"Start: {start_time.to_datetime_string()} {start_time.timezone_name}" if start_time else "Start: unknown",
+            f"End: {end_time.to_datetime_string()} {end_time.timezone_name}",
             f"Duration: {duration_sec}s",
             "Counts:",
             f"  - extracted: {extracted_count}",
@@ -1070,6 +1100,9 @@ def send_notification_email(**context):
         failed_tasks_escaped = ', '.join(escape(t) for t in failed_tasks) if failed_tasks else ''
         html_body = f"""
         <h3>Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'}</h3>
+        <p><strong>Execution (ET):</strong> {execution_label}</p>
+        <p><strong>Start:</strong> {start_time.to_datetime_string() if start_time else 'unknown'} {start_time.timezone_name if start_time else ''}</p>
+        <p><strong>End:</strong> {end_time.to_datetime_string()} {end_time.timezone_name}</p>
         <p><strong>Duration:</strong> {duration_sec}s</p>
         <ul>
           <li>extracted: {extracted_count}</li>
