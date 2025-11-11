@@ -263,9 +263,15 @@ class JSearchAdapter(SourceAdapter):
         normalized = location.strip().lower()
         if not normalized:
             return None
-        if len(normalized) == 2:
-            return normalized.upper()
-        return LOCATION_QUERY_MAP.get(normalized)
+        if len(normalized) == 2 and normalized.isalpha():
+            # Preserve two-letter ISO codes as lowercase (e.g., "ca" for Canada)
+            return normalized
+
+        mapped = LOCATION_QUERY_MAP.get(normalized)
+        if mapped:
+            return mapped
+
+        return normalized
 
     def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """
