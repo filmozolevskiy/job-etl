@@ -9,7 +9,7 @@ Refer to the provider site for latest changes. :contentReference[oaicite:2]{inde
 
 ## Authentication  
 For all endpoints:  
-- Use the header: `Authorization: Bearer <YOUR_API_KEY>`  
+- The provider documentation specifies `Authorization: Bearer <YOUR_API_KEY>`, however the live API currently requires `X-API-Key: <YOUR_API_KEY>`.  
 - Ensure your API key is valid and you are within rate limits. :contentReference[oaicite:3]{index=3}  
 
 ---
@@ -29,7 +29,7 @@ For all endpoints:
 | Parameter            | Type     | Required | Description |
 |----------------------|----------|----------|-------------|
 | `query`              | string   | ✅       | Search query text (e.g., "software engineer New York") :contentReference[oaicite:5]{index=5} |
-| `location`           | string   | ❌       | Location filter (city, state, country) |
+| `country`            | string   | ❌       | ISO 3166-1 alpha-2 country code from which to return postings (e.g., `ca`, `us`, `de`). Required for country-specific searches. |
 | `page`               | integer  | ❌       | Page number of results (pagination) |
 | `num_pages`          | integer  | ❌       | Number of pages to fetch (limit) :contentReference[oaicite:6]{index=6} |
 | `date_posted`        | string   | ❌       | Filter by when job was posted (e.g., “today”, “3days”, “week”, “month”, “all”) :contentReference[oaicite:7]{index=7} |
@@ -37,6 +37,10 @@ For all endpoints:
 | `employment_types`   | string[] | ❌       | Comma-separated list, e.g., “FULLTIME,CONTRACTOR,PARTTIME” :contentReference[oaicite:9]{index=9} |
 | `job_requirements`   | string[] | ❌       | Comma-separated list of filters like “no_experience”, “more_than_3_years_experience”, “no_degree” :contentReference[oaicite:10]{index=10} |
 | `radius`             | integer  | ❌       | Search radius in km from the given location (for geo filtering) :contentReference[oaicite:11]{index=11} |
+
+> **Note:** To retrieve postings for a specific country you must include the `country` parameter. For example, `country=de` is required when querying for jobs in Germany. Supported values follow the [ISO&nbsp;3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) list.
+>
+> **Implementation note:** The live API currently exposes the legacy path `/jsearch/search` with the `X-API-Key` header. Requests to `/v1/job-search` still return `403 Missing Authentication Token`.
 
 #### Sample Request  
 ```http

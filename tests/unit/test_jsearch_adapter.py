@@ -21,7 +21,7 @@ SAMPLE_JSEARCH_RESPONSE = {
     "request_id": "test-request-123",
     "parameters": {
         "query": "software engineer",
-        "location": "United States",
+        "country": "US",
         "page": 1,
         "num_pages": 1,
     },
@@ -92,6 +92,7 @@ class TestJSearchAdapterInit:
         assert adapter.source_name == "jsearch"
         assert adapter.api_key == "test-key"
         assert adapter.max_jobs == 10
+        assert adapter.country_code == "us"
         assert adapter.api_call_count == 0
 
     def test_init_with_env_var(self, monkeypatch):
@@ -143,9 +144,9 @@ class TestJSearchAdapterFetch:
         mock_get.assert_called_once()
         call_args = mock_get.call_args
 
-        assert "jsearch/search" in call_args[0][0]
+        assert call_args[0][0] == f"{adapter.base_url}/jsearch/search"
         assert call_args[1]["params"]["query"] == "analytics engineer"
-        assert call_args[1]["params"]["location"] == "us"
+        assert call_args[1]["params"]["country"] == "us"
         assert call_args[1]["params"]["page"] == 1
         assert call_args[1]["headers"]["X-API-Key"] == "test-key"
 
@@ -198,32 +199,32 @@ class TestJSearchAdapterFetch:
         assert next_page is None  # No more pages
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
-    def test_fetch_normalizes_location_to_country_code(self, mock_get):
-        """Location values are converted to 2-letter country codes when possible."""
+    def test_fetch_normalizes_country_string(self, mock_get):
+        """Country values are converted to ISO alpha-2 codes when possible."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = SAMPLE_JSEARCH_RESPONSE
         mock_get.return_value = mock_response
 
-        adapter = JSearchAdapter(api_key="test-key", location="Canada")
+        adapter = JSearchAdapter(api_key="test-key", country="Canada")
         adapter.fetch()
 
         call_args = mock_get.call_args
-        assert call_args[1]["params"]["location"] == "ca"
+        assert call_args[1]["params"]["country"] == "ca"
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
-    def test_fetch_preserves_iso_alpha2_location(self, mock_get):
+    def test_fetch_preserves_iso_alpha2_country(self, mock_get):
         """Two-letter ISO country codes remain lowercase for API requests."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = SAMPLE_JSEARCH_RESPONSE
         mock_get.return_value = mock_response
 
-        adapter = JSearchAdapter(api_key="test-key", location="ca")
+        adapter = JSearchAdapter(api_key="test-key", country="ca")
         adapter.fetch()
 
         call_args = mock_get.call_args
-        assert call_args[1]["params"]["location"] == "ca"
+        assert call_args[1]["params"]["country"] == "ca"
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")
     def test_fetch_empty_response(self, mock_get):
@@ -593,12 +594,13 @@ class TestJSearchAdapterEdgeCases:
         adapter = JSearchAdapter(
             api_key="test-key",
             query="data scientist",
-            location="Canada",
+            country="Canada",
             date_posted="week",
         )
 
         assert adapter.query == "data scientist"
-        assert adapter.location == "Canada"
+        assert adapter.country == "Canada"
+        assert adapter.country_code == "ca"
         assert adapter.date_posted == "week"
 
     @patch("services.source_extractor.adapters.jsearch_adapter.requests.get")

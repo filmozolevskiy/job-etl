@@ -143,7 +143,7 @@ Go to Admin → Variables in Airflow UI and add:
 | `JSEARCH_API_KEY` | API key for JSearch/OpenWebNinja | `your_api_key_here` |
 | `JSEARCH_BASE_URL` | (Optional) Base URL for API | `https://api.openwebninja.com` |
 | `JSEARCH_QUERY` | (Optional) Search query | `analytics engineer` |
-| `JSEARCH_LOCATION` | (Optional) Location filter | `United States` |
+| `JSEARCH_COUNTRY` | (Optional) ISO 3166-1 alpha-2 country code | `us` |
 | `JSEARCH_MAX_JOBS` | (Optional) Max jobs to fetch | `20` |
 | `SMTP_HOST` | (Optional) SMTP server hostname | `smtp.gmail.com` |
 | `SMTP_PORT` | (Optional) SMTP port | `587` |

@@ -500,8 +500,8 @@ def extract_source_jsearch(**context):
         jsearch_query = _get_airflow_var(
             'JSEARCH_QUERY', config_params.get('query', 'analytics engineer')
         )
-        jsearch_location = _get_airflow_var(
-            'JSEARCH_LOCATION', config_params.get('location', 'United States')
+        jsearch_country = _get_airflow_var(
+            'JSEARCH_COUNTRY', config_params.get('country', 'us')
         )
         jsearch_date_posted = _get_airflow_var(
             'JSEARCH_DATE_POSTED', config_params.get('date_posted', 'month')
@@ -525,7 +525,7 @@ def extract_source_jsearch(**context):
         print("Initializing JSearch adapter with configuration:")
         print(f"  base_url: {jsearch_base_url}")
         print(f"  query: {jsearch_query}")
-        print(f"  location: {jsearch_location}")
+        print(f"  country: {jsearch_country}")
         print(f"  date_posted: {jsearch_date_posted}")
         print(f"  max_jobs: {jsearch_max_jobs}")
 
@@ -534,7 +534,7 @@ def extract_source_jsearch(**context):
             base_url=jsearch_base_url,
             max_jobs=jsearch_max_jobs,
             query=jsearch_query,
-            location=jsearch_location,
+            country=jsearch_country,
             date_posted=jsearch_date_posted,
         )
 

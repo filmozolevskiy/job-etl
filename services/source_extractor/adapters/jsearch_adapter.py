@@ -24,17 +24,15 @@ logger = logging.getLogger(__name__)
 API_TIMEOUT_SECONDS = 30
 DEFAULT_MAX_JOBS = 20
 DEFAULT_QUERY = "analytics engineer"
-DEFAULT_LOCATION = "United States"
+DEFAULT_COUNTRY = "us"
 DEFAULT_DATE_POSTED = "month"
 
-LOCATION_QUERY_MAP: dict[str, str] = {
+COUNTRY_CODE_MAP: dict[str, str] = {
     "canada": "ca",
-    "CA": "ca",
     "united states": "us",
-    "US": "us",
     "usa": "us",
     "united kingdom": "uk",
-    "UK": "uk",
+    "great britain": "uk",
 }
 
 
@@ -55,7 +53,7 @@ class JSearchAdapter(SourceAdapter):
         base_url: Optional[str] = None,
         max_jobs: int = DEFAULT_MAX_JOBS,
         query: str = DEFAULT_QUERY,
-        location: str = DEFAULT_LOCATION,
+        country: str = DEFAULT_COUNTRY,
         date_posted: str = DEFAULT_DATE_POSTED,
     ):
         """
@@ -66,21 +64,33 @@ class JSearchAdapter(SourceAdapter):
             base_url: API base URL (defaults to JSEARCH_BASE_URL env var)
             max_jobs: Maximum number of jobs to fetch (default: 20)
             query: Job search query (default: "analytics engineer")
-            location: Location filter (default: "United States")
+            country: ISO 3166-1 alpha-2 country code or supported country name (default: "us")
             date_posted: Date filter - all/today/3days/week/month (default: "month")
         """
         super().__init__(source_name="jsearch")
 
         # Load configuration from environment or parameters
         self.api_key = api_key or os.getenv("JSEARCH_API_KEY")
-        self.base_url = base_url or os.getenv(
+        configured_base = base_url or os.getenv(
             "JSEARCH_BASE_URL", "https://api.openwebninja.com"
         )
+        self.base_url = configured_base.rstrip("/")
         self.max_jobs = max_jobs
         self.query = query
-        self.location = location
-        self.location_query = self._canonicalize_location_query(location)
         self.date_posted = date_posted
+
+        input_country = country or DEFAULT_COUNTRY
+        canonical_country = self._canonicalize_country_code(input_country)
+        if canonical_country:
+            self.country_code = canonical_country
+        else:
+            logger.warning(
+                "Unrecognized country `%s`; defaulting to `%s`",
+                country,
+                DEFAULT_COUNTRY,
+            )
+            self.country_code = DEFAULT_COUNTRY
+        self.country = input_country
 
         # Validate API key
         if not self.api_key:
@@ -98,6 +108,8 @@ class JSearchAdapter(SourceAdapter):
                 "source": self.source_name,
                 "base_url": self.base_url,
                 "max_jobs": self.max_jobs,
+                "country": self.country,
+                "country_code": self.country_code,
             },
         )
 
@@ -112,7 +124,7 @@ class JSearchAdapter(SourceAdapter):
         Make an API call to JSearch with retry logic.
 
         Args:
-            endpoint: API endpoint (e.g., 'jsearch/search')
+            endpoint: API endpoint (e.g., 'job-search')
             params: Query parameters
 
         Returns:
@@ -185,7 +197,7 @@ class JSearchAdapter(SourceAdapter):
             next_page_token is None if no more pages available
 
         Note:
-            Search parameters (query, location, date_posted) are configured
+            Search parameters (query, country, date_posted) are configured
             during adapter initialization.
         """
         # Determine current page
@@ -194,7 +206,7 @@ class JSearchAdapter(SourceAdapter):
         # Build search parameters from configuration
         params = {
             "query": self.query,
-            "location": self.location_query or self.location,
+            "country": self.country_code,
             "page": current_page,
             "num_pages": 1,  # Fetch one page at a time
             "date_posted": self.date_posted,
@@ -204,7 +216,7 @@ class JSearchAdapter(SourceAdapter):
             extra={
                 "page": current_page,
                 "query": params["query"],
-                "location": params["location"],
+                "country": params["country"],
                 "date_posted": params["date_posted"],
             },
         )
@@ -257,21 +269,20 @@ class JSearchAdapter(SourceAdapter):
         return jobs, next_page
 
     @staticmethod
-    def _canonicalize_location_query(location: Optional[str]) -> Optional[str]:
-        if not location:
+    def _canonicalize_country_code(country: Optional[str]) -> Optional[str]:
+        if not country:
             return None
-        normalized = location.strip().lower()
+        normalized = country.strip().lower()
         if not normalized:
             return None
         if len(normalized) == 2 and normalized.isalpha():
-            # Preserve two-letter ISO codes as lowercase (e.g., "ca" for Canada)
             return normalized
 
-        mapped = LOCATION_QUERY_MAP.get(normalized)
+        mapped = COUNTRY_CODE_MAP.get(normalized)
         if mapped:
             return mapped
 
-        return normalized
+        return None
 
     def map_to_common(self, raw: JobPostingRaw) -> dict[str, Any]:
         """
