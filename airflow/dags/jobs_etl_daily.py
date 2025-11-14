@@ -671,25 +671,76 @@ def normalize_data(**context):
 
 def enrich_data(**context):
     """
-    Enrich job postings with skills, standardized titles, locations, etc.
+    Enrich job postings with extracted skills written back to staging tables.
 
-    For now, this is a no-op placeholder. In the next phase, this will:
-    - Call the enricher service (via DockerOperator)
-    - Extract skills using NLP
-    - Standardize job titles via taxonomy
-    - Normalize locations and salaries
-    - Update staging tables with enriched data
+    The enricher service executes locally (PythonOperator in development). It:
+    - Loads the curated skills taxonomy from config/taxonomy/skills_dictionary.yml
+    - Uses spaCy + keyword lists to extract skills from descriptions
+    - Updates staging.job_postings_stg.skills_raw with normalized skill arrays
     """
+    import sys
+
+    project_root = '/opt/airflow'
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     print("=" * 60)
-    print("ENRICH TASK")
-    print("=" * 60)
-    print("TODO: Implement enrichment")
-    print("  - Will call enricher service")
-    print("  - Extract skills, standardize titles")
-    print("  - Normalize locations and salaries")
+    print("ENRICH TASK - Starting")
     print("=" * 60)
 
-    return {"enriched_count": 0}
+    try:
+        from services.enricher.db_operations import EnricherDB
+        from services.enricher.main import run_enricher
+        from services.enricher.skills_extractor import (
+            SkillsExtractor,
+            load_skills_dictionary,
+        )
+
+        database_url = _get_database_url('postgres_default')
+
+        print("Connecting to database for enrichment")
+
+        dictionary_path = _get_airflow_var('SKILLS_DICTIONARY_PATH')
+        if dictionary_path:
+            print(f"Loading skills dictionary from: {dictionary_path}")
+
+        dictionary = load_skills_dictionary(dictionary_path)
+        extractor = SkillsExtractor(dictionary=dictionary)
+        db = EnricherDB(database_url)
+
+        ti = context['ti']
+        normalize_result = ti.xcom_pull(task_ids='normalize', default={})
+        source_filter = normalize_result.get('source')
+        sources = [source_filter] if source_filter else None
+
+        stats = run_enricher(
+            db=db,
+            extractor=extractor,
+            sources=sources,
+            include_existing=False,
+            dry_run=False,
+        )
+
+        print("Enrichment results:")
+        print(f"  - fetched:   {stats['fetched']}")
+        print(f"  - processed: {stats['processed']}")
+        print(f"  - updated:   {stats['updated']}")
+        print(f"  - unchanged: {stats['unchanged']}")
+        print("=" * 60)
+
+        return {
+            "enriched_count": stats["updated"],
+            "enriched_processed": stats["processed"],
+        }
+
+    except Exception as e:
+        print("=" * 60)
+        print("ENRICH TASK - Error")
+        print("=" * 60)
+        print(f"Error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        print("=" * 60)
+        raise
 
 
 def rank_jobs(**context):

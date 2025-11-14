@@ -1,0 +1,13 @@
+# Enricher service dependencies
+
+# Database access
+psycopg2-binary==2.9.9
+
+# NLP
+spacy>=3.7,<3.8
+
+# Configuration / utilities
+pyyaml>=6.0
+python-dotenv==1.0.0
+
+

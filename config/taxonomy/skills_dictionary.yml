@@ -1,0 +1,61 @@
+skills:
+  python:
+    aliases:
+      - python
+      - python3
+  sql:
+    aliases:
+      - sql
+      - structured query language
+  airflow:
+    aliases:
+      - airflow
+      - apache airflow
+  dbt:
+    aliases:
+      - dbt
+      - data build tool
+  tableau:
+    aliases:
+      - tableau
+      - tableau desktop
+  docker:
+    aliases:
+      - docker
+  aws:
+    aliases:
+      - aws
+      - amazon web services
+  spark:
+    aliases:
+      - spark
+      - apache spark
+  pandas:
+    aliases:
+      - pandas
+  machine learning:
+    aliases:
+      - machine learning
+      - ml
+  snowflake:
+    aliases:
+      - snowflake
+  power bi:
+    aliases:
+      - power bi
+      - powerbi
+  azure:
+    aliases:
+      - azure
+      - microsoft azure
+  jira:
+    aliases:
+      - jira
+  git:
+    aliases:
+      - git
+  data warehousing:
+    aliases:
+      - data warehouse
+      - data warehousing
+
