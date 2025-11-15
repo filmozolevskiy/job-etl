@@ -44,6 +44,7 @@ def _extractor() -> SkillsExtractor:
 
 
 def test_run_enricher_updates_changed_rows() -> None:
+    """Test that enricher updates rows when extracted skills differ from existing."""
     db = StubEnricherDB(
         rows=[
             {
@@ -63,7 +64,8 @@ def test_run_enricher_updates_changed_rows() -> None:
         ]
     )
 
-    stats = run_enricher(db=db, extractor=_extractor())
+    # Include existing rows so we can test updating hash1 from ["Python"] to ["python", "sql"]
+    stats = run_enricher(db=db, extractor=_extractor(), include_existing=True)
 
     assert stats["fetched"] == 2
     assert stats["processed"] == 2
