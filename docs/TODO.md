@@ -103,9 +103,10 @@
 
 ## Phase 1 — Enrichment & Data Quality (feature depth)
 
-* [ ] **Skills extraction (spaCy + keyword lists)**
+* [x] **Skills extraction (spaCy + keyword lists)**
 
   * **AC:** `enricher` populates `skills` (lowercased, distinct); unit tests cover extraction on sample postings.
+  * **Implementation:** `SkillsExtractor` with spaCy PhraseMatcher, `SkillsDictionary` with YAML config (`config/taxonomy/skills_dictionary.yml`), integrated into Airflow DAG. Extracts skills from job descriptions and normalizes to canonical names. All tests passing.
 
 * [ ] **Title standardization (taxonomy-driven)**
 
