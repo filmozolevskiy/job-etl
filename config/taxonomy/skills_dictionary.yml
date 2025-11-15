@@ -1,12 +1,51 @@
 skills:
+  # Programming Languages
   python:
     aliases:
       - python
       - python3
+      - py
   sql:
     aliases:
       - sql
       - structured query language
+      - postgresql
+      - postgres
+      - mysql
+      - sql server
+      - t-sql
+      - pl/sql
+  java:
+    aliases:
+      - java
+      - java 8
+      - java 11
+      - java 17
+  javascript:
+    aliases:
+      - javascript
+      - js
+      - node.js
+      - nodejs
+      - node
+  typescript:
+    aliases:
+      - typescript
+      - ts
+  scala:
+    aliases:
+      - scala
+  go:
+    aliases:
+      - go
+      - golang
+  r:
+    aliases:
+      - r
+      - r language
+      - r programming
+
+  # Data Engineering & ETL
   airflow:
     aliases:
       - airflow
@@ -15,47 +54,440 @@ skills:
     aliases:
       - dbt
       - data build tool
-  tableau:
-    aliases:
-      - tableau
-      - tableau desktop
-  docker:
-    aliases:
-      - docker
-  aws:
-    aliases:
-      - aws
-      - amazon web services
   spark:
     aliases:
       - spark
       - apache spark
-  pandas:
+      - pyspark
+      - spark sql
+  hadoop:
     aliases:
-      - pandas
-  machine learning:
+      - hadoop
+      - apache hadoop
+  kafka:
     aliases:
-      - machine learning
-      - ml
-  snowflake:
+      - kafka
+      - apache kafka
+  etl:
     aliases:
-      - snowflake
-  power bi:
+      - etl
+      - extract transform load
+      - elt
+      - extract load transform
+  data pipelines:
     aliases:
-      - power bi
-      - powerbi
-  azure:
-    aliases:
-      - azure
-      - microsoft azure
-  jira:
-    aliases:
-      - jira
-  git:
-    aliases:
-      - git
+      - data pipeline
+      - data pipelines
+      - pipeline
+      - pipelines
   data warehousing:
     aliases:
       - data warehouse
       - data warehousing
+      - data warehousing
+      - dw
+  data modeling:
+    aliases:
+      - data modeling
+      - data model
+      - dimensional modeling
+      - star schema
+      - snowflake schema
 
+  # Data Processing & Analytics
+  pandas:
+    aliases:
+      - pandas
+  numpy:
+    aliases:
+      - numpy
+      - numpy
+  pyspark:
+    aliases:
+      - pyspark
+      - spark python
+  apache beam:
+    aliases:
+      - apache beam
+      - beam
+      - dataflow
+  databricks:
+    aliases:
+      - databricks
+  snowflake:
+    aliases:
+      - snowflake
+  redshift:
+    aliases:
+      - redshift
+      - amazon redshift
+      - aws redshift
+  bigquery:
+    aliases:
+      - bigquery
+      - google bigquery
+      - gcp bigquery
+  data lake:
+    aliases:
+      - data lake
+      - data lakes
+      - lakehouse
+
+  # Business Intelligence & Visualization
+  tableau:
+    aliases:
+      - tableau
+      - tableau desktop
+      - tableau server
+      - tableau prep
+  power bi:
+    aliases:
+      - power bi
+      - powerbi
+      - microsoft power bi
+  looker:
+    aliases:
+      - looker
+      - looker studio
+      - google looker
+  qlik:
+    aliases:
+      - qlik
+      - qlikview
+      - qlik sense
+  excel:
+    aliases:
+      - excel
+      - microsoft excel
+      - ms excel
+  data visualization:
+    aliases:
+      - data visualization
+      - data viz
+      - visualization
+      - dashboards
+      - dashboard
+
+  # Cloud Platforms
+  aws:
+    aliases:
+      - aws
+      - amazon web services
+      - amazon aws
+  azure:
+    aliases:
+      - azure
+      - microsoft azure
+      - azure cloud
+  gcp:
+    aliases:
+      - gcp
+      - google cloud platform
+      - google cloud
+      - gcp cloud
+
+  # AWS Services
+  s3:
+    aliases:
+      - s3
+      - amazon s3
+      - aws s3
+  ec2:
+    aliases:
+      - ec2
+      - amazon ec2
+      - aws ec2
+  lambda:
+    aliases:
+      - lambda
+      - aws lambda
+      - amazon lambda
+  glue:
+    aliases:
+      - glue
+      - aws glue
+      - amazon glue
+  emr:
+    aliases:
+      - emr
+      - aws emr
+      - elastic mapreduce
+  rds:
+    aliases:
+      - rds
+      - aws rds
+      - amazon rds
+  athena:
+    aliases:
+      - athena
+      - aws athena
+      - amazon athena
+
+  # Azure Services
+  azure data factory:
+    aliases:
+      - azure data factory
+      - adf
+      - data factory
+  azure databricks:
+    aliases:
+      - azure databricks
+      - azure databricks
+  azure synapse:
+    aliases:
+      - azure synapse
+      - synapse
+      - synapse analytics
+
+  # Containerization & Orchestration
+  docker:
+    aliases:
+      - docker
+      - docker container
+  kubernetes:
+    aliases:
+      - kubernetes
+      - k8s
+      - kube
+  containerization:
+    aliases:
+      - containerization
+      - containers
+      - container
+
+  # Version Control & DevOps
+  git:
+    aliases:
+      - git
+      - github
+      - gitlab
+      - bitbucket
+  ci/cd:
+    aliases:
+      - ci/cd
+      - cicd
+      - continuous integration
+      - continuous deployment
+      - jenkins
+      - github actions
+      - gitlab ci
+      - circleci
+  terraform:
+    aliases:
+      - terraform
+      - tf
+  ansible:
+    aliases:
+      - ansible
+  jenkins:
+    aliases:
+      - jenkins
+
+  # Machine Learning & AI
+  machine learning:
+    aliases:
+      - machine learning
+      - ml
+      - ml engineering
+  deep learning:
+    aliases:
+      - deep learning
+      - neural networks
+      - cnn
+      - rnn
+  tensorflow:
+    aliases:
+      - tensorflow
+      - tf
+  pytorch:
+    aliases:
+      - pytorch
+  scikit-learn:
+    aliases:
+      - scikit-learn
+      - sklearn
+      - scikit learn
+  xgboost:
+    aliases:
+      - xgboost
+      - xgb
+
+  # Databases
+  mongodb:
+    aliases:
+      - mongodb
+      - mongo
+  cassandra:
+    aliases:
+      - cassandra
+      - apache cassandra
+  redis:
+    aliases:
+      - redis
+  elasticsearch:
+    aliases:
+      - elasticsearch
+      - elk
+      - elastic stack
+
+  # APIs & Web Development
+  rest api:
+    aliases:
+      - rest api
+      - rest
+      - restful
+      - api
+      - apis
+  graphql:
+    aliases:
+      - graphql
+  microservices:
+    aliases:
+      - microservices
+      - microservice
+      - microservice architecture
+
+  # Testing & QA
+  qa:
+    aliases:
+      - qa
+      - quality assurance
+      - testing
+  test automation:
+    aliases:
+      - test automation
+      - automated testing
+      - automation testing
+  selenium:
+    aliases:
+      - selenium
+      - selenium webdriver
+  pytest:
+    aliases:
+      - pytest
+      - py.test
+  jest:
+    aliases:
+      - jest
+  cypress:
+    aliases:
+      - cypress
+  jmeter:
+    aliases:
+      - jmeter
+      - apache jmeter
+  testng:
+    aliases:
+      - testng
+      - test ng
+  junit:
+    aliases:
+      - junit
+      - j unit
+
+  # Project Management & Agile
+  agile:
+    aliases:
+      - agile
+      - agile methodology
+      - agile development
+  scrum:
+    aliases:
+      - scrum
+      - scrum master
+      - scrum methodology
+  kanban:
+    aliases:
+      - kanban
+  jira:
+    aliases:
+      - jira
+      - atlassian jira
+  confluence:
+    aliases:
+      - confluence
+      - atlassian confluence
+  project management:
+    aliases:
+      - project management
+      - pm
+      - project manager
+      - program management
+
+  # Statistics & Analytics
+  statistics:
+    aliases:
+      - statistics
+      - stats
+      - statistical analysis
+  a/b testing:
+    aliases:
+      - a/b testing
+      - ab testing
+      - split testing
+  hypothesis testing:
+    aliases:
+      - hypothesis testing
+      - statistical testing
+
+  # Additional Data Tools
+  apache superset:
+    aliases:
+      - superset
+      - apache superset
+  metabase:
+    aliases:
+      - metabase
+  dremio:
+    aliases:
+      - dremio
+  presto:
+    aliases:
+      - presto
+      - trino
+      - prestodb
+
+  # Monitoring & Observability
+  datadog:
+    aliases:
+      - datadog
+  new relic:
+    aliases:
+      - new relic
+      - newrelic
+  prometheus:
+    aliases:
+      - prometheus
+  grafana:
+    aliases:
+      - grafana
+  splunk:
+    aliases:
+      - splunk
+
+  # Additional Frameworks & Tools
+  react:
+    aliases:
+      - react
+      - react.js
+      - reactjs
+  angular:
+    aliases:
+      - angular
+      - angularjs
+  vue:
+    aliases:
+      - vue
+      - vue.js
+      - vuejs
+  django:
+    aliases:
+      - django
+  flask:
+    aliases:
+      - flask
+      - python flask
+  fastapi:
+    aliases:
+      - fastapi
+      - fast api
