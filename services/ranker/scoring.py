@@ -374,8 +374,9 @@ def calculate_rank(job: dict[str, Any], config: RankingConfig) -> tuple[float, d
         config.weights.company_size * company_size_score
     )
 
-    # Scale to 0-100
+    # Scale to 0-100 and normalize (round to 2 decimal places, clamp to 0-100)
     rank_score = weighted_score * 100
+    rank_score = max(0.0, min(100.0, round(rank_score, 2)))
 
     # Build explain dict
     rank_explain = {
