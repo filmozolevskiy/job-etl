@@ -59,6 +59,7 @@ ignore = [
     "N812",    # Lowercase imported as non-lowercase (common with pandas as pd)
     "UP006",   # Use X instead of Y for typing (too opinionated for learning)
     "UP007",   # Use X | Y instead of Union[X, Y] (Python 3.10+ syntax)
+    "UP045",   # Use X | None instead of Optional[X] (Python 3.10+ syntax, project supports 3.9+)
 ]
 
 # Allow autofix for all enabled rules
