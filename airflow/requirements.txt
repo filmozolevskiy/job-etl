@@ -13,6 +13,10 @@ dbt-postgres==1.7.4
 # Tableau Hyper API for publisher
 tableauhyperapi
 
+# Enricher service dependencies (skills extraction)
+spacy>=3.7,<3.8
+pyyaml>=6.0
+
 # HTTP requests (already included in Airflow)
 # requests==2.31.0
 # urllib3==2.1.0
