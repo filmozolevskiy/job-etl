@@ -138,6 +138,7 @@
 | location        | text        | raw city/region/country                                            |       |            |
 | remote_type     | text        | enum: `remote`, `hybrid`, `onsite`, `unknown`                      |       |            |
 | contract_type   | text        | enum: `full_time`,`part_time`,`contract`,`intern`,`temp`,`unknown` |       |            |
+| seniority_level | text        | enum: `junior`, `intermediate`, `senior`, `unknown` (extracted from title) |       |            |
 | salary_min      | numeric     | nullable                                                           |       |            |
 | salary_max      | numeric     | nullable                                                           |       |            |
 | salary_currency | text        | ISO 4217                                                           |       |            |
@@ -173,6 +174,7 @@
 | location_lon         | numeric       | optional              |
 | remote_type          | text          | enum                  |
 | contract_type        | text          | enum                  |
+| seniority_level      | text          | enum (junior/intermediate/senior/unknown) |
 | salary_min_norm      | numeric       | in base currency      |
 | salary_max_norm      | numeric       | in base currency      |
 | salary_currency_norm | text          | base (e.g., `CAD`)    |

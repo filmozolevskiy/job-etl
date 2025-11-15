@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from .hash_generator import generate_hash_key
+from .seniority_extractor import extract_seniority_level
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
             'location': str,           # Required
             'remote_type': str,        # Default: 'unknown'
             'contract_type': str,      # Default: 'unknown'
+            'seniority_level': str,    # Default: 'unknown'
             'salary_min': float | None,
             'salary_max': float | None,
             'salary_currency': str | None,
@@ -131,6 +133,9 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
             'company_size'
         )
 
+        # Extract seniority level from job title
+        seniority_level = extract_seniority_level(job_title)
+
         # Parse posted_at timestamp if present
         posted_at = _parse_timestamp(raw_data.get('posted_at'))
 
@@ -162,6 +167,7 @@ def normalize_job_posting(raw_data: dict[str, Any], source: str) -> dict[str, An
             'location': location.strip(),
             'remote_type': remote_type,
             'contract_type': contract_type,
+            'seniority_level': seniority_level,
             'salary_min': salary_min,
             'salary_max': salary_max,
             'salary_currency': _safe_string(raw_data.get('salary_currency')),

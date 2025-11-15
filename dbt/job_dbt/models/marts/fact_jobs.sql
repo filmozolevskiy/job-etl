@@ -27,6 +27,7 @@ WITH staging AS (
         location,
         remote_type,
         contract_type,
+        seniority_level,
         salary_min,
         salary_max,
         salary_currency,
@@ -59,6 +60,7 @@ SELECT
     staging.location AS location_std,  -- Will be enriched later
     staging.remote_type,
     staging.contract_type,
+    staging.seniority_level,
     
     -- Normalized salary fields (will be enriched later)
     staging.salary_min AS salary_min_norm,

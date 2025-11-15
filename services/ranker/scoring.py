@@ -12,6 +12,32 @@ from .config_loader import RankingConfig
 
 logger = logging.getLogger(__name__)
 
+# Import shared seniority extraction from normalizer service
+try:
+    from services.normalizer.seniority_extractor import extract_seniority_level
+except ImportError:
+    # Fallback if import fails (e.g., in containerized environments)
+    # This should not happen in normal operation, but provides resilience
+    logger.warning(
+        "Could not import extract_seniority_level from normalizer service. "
+        "Using fallback implementation."
+    )
+    
+    def extract_seniority_level(job_title: str) -> str:
+        """Fallback implementation if import fails."""
+        if not job_title or not isinstance(job_title, str):
+            return 'unknown'
+        job_title_lower = job_title.lower()
+        seniority_keywords = {
+            'senior': ['senior', 'sr', 'lead', 'principal', 'staff', 'architect'],
+            'intermediate': ['intermediate', 'mid-level', 'mid level', 'mid'],
+            'junior': ['junior', 'jr', 'associate', 'entry', 'entry-level', 'entry level'],
+        }
+        for level, keywords in seniority_keywords.items():
+            if any(keyword in job_title_lower for keyword in keywords):
+                return level
+        return 'unknown'
+
 
 def calculate_title_score(job_title: str, title_keywords: list[str]) -> float:
     """
@@ -239,7 +265,8 @@ def calculate_seniority_score(job_title: str, seniority_preferences: list[str]) 
     """
     Calculate score based on job seniority.
 
-    Simple keyword detection for MVP.
+    Uses shared extraction logic from normalizer service to determine seniority level,
+    then scores based on user preferences.
 
     Args:
         job_title: Job title to analyze
@@ -251,25 +278,14 @@ def calculate_seniority_score(job_title: str, seniority_preferences: list[str]) 
     if not job_title:
         return 0.5
 
-    job_title_lower = job_title.lower()
+    # Use shared extraction function to determine seniority level
+    detected_seniority = extract_seniority_level(job_title)
 
-    # Seniority indicators
-    seniority_keywords = {
-        'junior': ['junior', 'jr', 'associate', 'entry'],
-        'intermediate': ['intermediate', 'mid-level', 'mid level'],
-        'senior': ['senior', 'sr', 'lead', 'principal'],
-    }
-
-    # Determine job seniority
-    detected_seniority = None
-    for level, keywords in seniority_keywords.items():
-        if any(keyword in job_title_lower for keyword in keywords):
-            detected_seniority = level
-            break
-
-    if not detected_seniority:
+    # If seniority cannot be determined, return neutral score
+    if detected_seniority == 'unknown':
         return 0.5  # Can't determine - neutral
 
+    # Check if detected seniority matches user preferences
     if detected_seniority in [s.lower() for s in seniority_preferences]:
         return 1.0
 

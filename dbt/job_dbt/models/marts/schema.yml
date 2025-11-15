@@ -71,6 +71,13 @@ models:
           - accepted_values:
               values: ['full_time', 'part_time', 'contract', 'intern', 'temp', 'unknown']
       
+      - name: seniority_level
+        description: "Job seniority level extracted from title"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['junior', 'intermediate', 'senior', 'unknown']
+      
       - name: salary_min_norm
         description: "Normalized minimum salary"
       
