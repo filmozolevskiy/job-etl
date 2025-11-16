@@ -443,16 +443,46 @@ jobs:
         with:
           script: |
             const sha = context.sha.substring(0, 7);
+            const branch = context.ref.replace('refs/heads/', '');
             
+            // Get all open CI failure issues
             const { data: openIssues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'ci-failure'
+              labels: 'ci-failure',
+              per_page: 100
             });
             
+            console.log(`Found ${openIssues.length} open CI failure issues`);
+            
+            // Close issues that match:
+            // 1. Same branch (most common case - fix on same branch)
+            // 2. Same commit SHA (if issue was just created)
+            // 3. All issues on main branch when main passes (main is the primary branch)
             for (const issue of openIssues) {
-              if (issue.body && (issue.body.includes(context.sha) || issue.body.includes(sha))) {
+              let shouldClose = false;
+              
+              if (issue.body) {
+                // Check if issue is for the same branch
+                const branchMatch = issue.body.match(/\*\*Branch:\*\* (.+)/);
+                if (branchMatch && branchMatch[1] === branch) {
+                  shouldClose = true;
+                }
+                
+                // Check if issue contains current commit SHA
+                if (issue.body.includes(context.sha) || issue.body.includes(sha)) {
+                  shouldClose = true;
+                }
+                
+                // If we're on main and CI passes, close all CI failure issues
+                // (main is the primary branch, so passing main means issues are resolved)
+                if (branch === 'main') {
+                  shouldClose = true;
+                }
+              }
+              
+              if (shouldClose) {
                 await github.rest.issues.update({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -465,9 +495,9 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: issue.number,
-                  body: '✅ CI Pipeline is now passing. Auto-closing.'
+                  body: `✅ CI Pipeline is now passing on ${branch} (${sha}). Auto-closing this issue.`
                 });
-                console.log(`Closed issue #${issue.number}`);
+                console.log(`✅ Closed issue #${issue.number} (${issue.title})`);
               }
             }
       
