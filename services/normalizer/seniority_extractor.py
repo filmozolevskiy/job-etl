@@ -9,8 +9,6 @@ if a position is junior, intermediate, or senior level.
 """
 
 import re
-from typing import Optional
-
 
 # Valid seniority levels (must match database CHECK constraints)
 VALID_SENIORITY_LEVELS = {'junior', 'intermediate', 'senior', 'unknown'}
@@ -51,8 +49,8 @@ def extract_seniority_level(job_title: str) -> str:
     # Level I = Junior, Level II = Intermediate, Level III = Senior
     # Check III first to avoid matching II or I within it
     # Patterns: "Engineer III", "Level III", "III", " iii ", etc.
-    if (' iii' in job_title_lower or 
-        'level iii' in job_title_lower or 
+    if (' iii' in job_title_lower or
+        'level iii' in job_title_lower or
         job_title_lower.startswith('iii') or
         job_title_lower.endswith(' iii') or
         ' iii,' in job_title_lower or
@@ -64,7 +62,7 @@ def extract_seniority_level(job_title: str) -> str:
     # Patterns: "Engineer II", "Level II", "II", " ii ", etc.
     # Note: "Engineer II" has no space before II, so check for that pattern
     if (' ii ' in job_title_lower or
-        'level ii' in job_title_lower or 
+        'level ii' in job_title_lower or
         job_title_lower.startswith('ii ') or
         job_title_lower.endswith(' ii') or
         ' ii,' in job_title_lower or
@@ -84,7 +82,7 @@ def extract_seniority_level(job_title: str) -> str:
         'engineer i ' in job_title_lower or
         'engineer i)' in job_title_lower):
         return 'junior'
-    
+
     # Check for numeric/letter levels (L4, L5, L6, etc.)
     # L4 = Intermediate, L5+ = Senior
     level_match = re.search(r'\bL([4-9]|[1-9][0-9]+)\b', job_title_lower)
@@ -94,11 +92,11 @@ def extract_seniority_level(job_title: str) -> str:
             return 'senior'
         elif level_num == 4:
             return 'intermediate'
-    
+
     # Check for other seniority indicators
     if any(keyword in job_title_lower for keyword in ['advanced', 'director', 'manager', 'vp', 'vice president', 'head of']):
         return 'senior'
-    
+
     if 'intern' in job_title_lower:
         return 'junior'
 

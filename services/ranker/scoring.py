@@ -22,7 +22,7 @@ except ImportError:
         "Could not import extract_seniority_level from normalizer service. "
         "Using fallback implementation."
     )
-    
+
     def extract_seniority_level(job_title: str) -> str:
         """Fallback implementation if import fails."""
         if not job_title or not isinstance(job_title, str):
