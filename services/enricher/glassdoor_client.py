@@ -93,19 +93,31 @@ class GlassdoorClient:
                 url, headers=headers, params=params, timeout=API_TIMEOUT_SECONDS
             )
 
-            # Handle HTTP errors with specific logging
-            if response.status_code == 401:
-                logger.error("Invalid API key - check GLASSDOOR_API_KEY")
-            elif response.status_code == 429:
-                logger.error("Rate limit exceeded - too many API calls")
-            elif response.status_code >= 400:
-                logger.error(
-                    "API error %s: %s", response.status_code, response.text[:200]
-                )
-            
-            # Raise HTTPError for 4xx and 5xx status codes
-            # This will raise requests.exceptions.HTTPError with proper response object
-            response.raise_for_status()
+            # Handle HTTP errors with specific logging and custom messages
+            try:
+                response.raise_for_status()
+            except requests.exceptions.HTTPError:
+                # Log specific error messages
+                if response.status_code == 401:
+                    logger.error("Invalid API key - check GLASSDOOR_API_KEY")
+                    raise requests.exceptions.HTTPError(
+                        "Invalid API key - check GLASSDOOR_API_KEY", response=response
+                    )
+                elif response.status_code == 429:
+                    logger.error("Rate limit exceeded - too many API calls")
+                    raise requests.exceptions.HTTPError(
+                        "Rate limit exceeded - too many API calls", response=response
+                    )
+                elif response.status_code >= 400:
+                    logger.error(
+                        "API error %s: %s", response.status_code, response.text[:200]
+                    )
+                    raise requests.exceptions.HTTPError(
+                        f"API error {response.status_code}: {response.text[:200]}",
+                        response=response,
+                    )
+                # Re-raise if not handled above
+                raise
 
             try:
                 data = response.json()
