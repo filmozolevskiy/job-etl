@@ -23,7 +23,16 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001+', 'unknown']
+              values: 
+                - '1 to 50 Employees'
+                - '51 to 200 Employees'
+                - '201 to 500 Employees'
+                - '501 to 1000 Employees'
+                - '1001 to 5000 Employees'
+                - '5001 to 10000 Employees'
+                - '10000+ Employees'
+                - 'Unknown'
+                - 'unknown'
       
       - name: year_founded
         description: "Year company was founded (from Glassdoor)"
