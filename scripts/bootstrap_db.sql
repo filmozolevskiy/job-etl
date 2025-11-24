@@ -69,7 +69,7 @@ GRANT ALL PRIVILEGES ON TABLE staging.job_postings_stg TO job_etl_user;
 
 -- Create marts tables (populated by dbt models during the dbt_models_core task)
 CREATE TABLE IF NOT EXISTS marts.dim_companies (
-    company_id SERIAL PRIMARY KEY,
+    company_id TEXT PRIMARY KEY, 
     company TEXT NOT NULL,
     company_size TEXT,
     source_first_seen TEXT,
@@ -77,10 +77,9 @@ CREATE TABLE IF NOT EXISTS marts.dim_companies (
 );
 
 CREATE TABLE IF NOT EXISTS marts.fact_jobs (
-    job_id SERIAL PRIMARY KEY,
-    hash_key TEXT UNIQUE NOT NULL,
+    hash_key TEXT PRIMARY KEY,
     job_title_std TEXT,
-    company_id INTEGER REFERENCES marts.dim_companies(company_id),
+    company_id TEXT REFERENCES marts.dim_companies(company_id),
     location_std TEXT,
     location_lat NUMERIC,
     location_lon NUMERIC,
@@ -109,8 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_fact_jobs_posted_at ON marts.fact_jobs(posted_at)
 -- Grant permissions on marts tables
 GRANT ALL PRIVILEGES ON TABLE marts.dim_companies TO job_etl_user;
 GRANT ALL PRIVILEGES ON TABLE marts.fact_jobs TO job_etl_user;
-GRANT ALL PRIVILEGES ON SEQUENCE marts.dim_companies_company_id_seq TO job_etl_user;
-GRANT ALL PRIVILEGES ON SEQUENCE marts.fact_jobs_job_id_seq TO job_etl_user;
+-- Note: No sequence grants needed since company_id and hash_key are TEXT (not SERIAL)
 
 -- Create a function to generate hash_key (for deduplication)
 CREATE OR REPLACE FUNCTION generate_hash_key(
