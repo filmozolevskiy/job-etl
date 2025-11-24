@@ -56,13 +56,18 @@
         </mxCell>
         
         <!-- dbt Models Core Task -->
-        <mxCell id="dbt-models" value="dbt_models_core&#xa;Build Dimensions &amp; Facts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
-          <mxGeometry x="700" y="580" width="200" height="60" as="geometry" />
+        <mxCell id="dbt-models" value="dbt_models_core&#xa;Build Dimensions &amp; Facts&#xa;&#xa;• Runs dim_companies&#xa;• Runs fact_jobs&#xa;• Generates surrogate keys" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="700" y="580" width="200" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- dbt Service -->
+        <mxCell id="dbt-service" value="dbt&#xa;Transformations&#xa;&#xa;• Reads from staging&#xa;• Builds marts schema&#xa;• Creates dim/fact tables" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="580" width="200" height="100" as="geometry" />
         </mxCell>
         
         <!-- Dedupe Task -->
-        <mxCell id="dedupe" value="dedupe_consolidate&#xa;Deduplicate by hash_key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
-          <mxGeometry x="700" y="680" width="200" height="60" as="geometry" />
+        <mxCell id="dedupe" value="dedupe_consolidate&#xa;Deduplicate by hash_key&#xa;&#xa;• Uses hash_key = md5(company|title|location)&#xa;• Upserts: update last_seen_at if exists&#xa;• Preserves first_seen_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="700" y="680" width="200" height="100" as="geometry" />
         </mxCell>
         
         <!-- Rank Task -->
@@ -161,22 +166,22 @@
         
         <mxCell id="arrow5" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="enrich" target="dbt-models">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
-            <mxPoint x="800" y="580" as="sourcePoint" />
-            <mxPoint x="850" y="530" as="targetPoint" />
+            <mxPoint x="800" y="510" as="sourcePoint" />
+            <mxPoint x="800" y="630" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         
         <mxCell id="arrow6" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="dbt-models" target="dedupe">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="800" y="680" as="sourcePoint" />
-            <mxPoint x="850" y="630" as="targetPoint" />
+            <mxPoint x="800" y="730" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         
         <mxCell id="arrow7" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="dedupe" target="rank">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="800" y="780" as="sourcePoint" />
-            <mxPoint x="850" y="730" as="targetPoint" />
+            <mxPoint x="800" y="810" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         
@@ -248,6 +253,55 @@
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="900" y="510" as="sourcePoint" />
             <mxPoint x="1000" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-enrich-read-staging" value="reads" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="staging-schema" target="enricher">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="570" as="sourcePoint" />
+            <mxPoint x="1000" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-enrich-update-staging" value="updates" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="enricher" target="staging-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="530" as="sourcePoint" />
+            <mxPoint x="400" y="660" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-dbt-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="dbt-models" target="dbt-service">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="630" as="sourcePoint" />
+            <mxPoint x="1000" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-dbt-read-staging" value="reads" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="staging-schema" target="dbt-service">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="660" as="sourcePoint" />
+            <mxPoint x="1000" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-dbt-write-marts" value="writes" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="dbt-service" target="marts-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="630" as="sourcePoint" />
+            <mxPoint x="400" y="840" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-dedupe-read-marts" value="reads" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="marts-schema" target="dedupe">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="730" as="sourcePoint" />
+            <mxPoint x="700" y="730" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-dedupe-update-marts" value="upserts" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="dedupe" target="marts-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="700" y="730" as="sourcePoint" />
+            <mxPoint x="400" y="840" as="targetPoint" />
           </mxGeometry>
         </mxCell>
         
