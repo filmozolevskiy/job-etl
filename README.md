@@ -150,6 +150,13 @@ The next phase will involve:
 3. Implementing the first data source adapter
 4. Building the ETL pipeline
 
+## Documentation
+
+- **[Architecture Diagrams](docs/architecture/c4-diagrams.md)** - C4 model diagrams (Mermaid) showing system context, containers, and components
+- **[ETL Flow Diagram](docs/architecture/job-etl-flow.drawio)** - Detailed interactive pipeline flowchart (Draw.io) showing the complete Airflow DAG flow
+- **[Specification](docs/specification.md)** - Complete system specification and requirements
+- **[TODO](docs/TODO.md)** - Development roadmap and phased tasks
+
 ## Development
 
 ### Continuous Integration

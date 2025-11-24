@@ -1,0 +1,379 @@
+<mxfile host="app.diagrams.net" modified="2025-01-27T00:00:00.000Z" agent="5.0" version="21.0.0" etag="drawio" type="device">
+  <diagram name="Job-ETL Flow" id="job-etl-flow">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Job-ETL Daily Pipeline Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="400" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Airflow DAG -->
+        <mxCell id="airflow" value="Airflow DAG&#xa;jobs_etl_daily&#xa;Schedule: 07:00 America/Toronto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="650" y="80" width="300" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Start Task -->
+        <mxCell id="start" value="START" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="200" width="200" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Extract Task -->
+        <mxCell id="extract" value="extract_jsearch&#xa;Extract from JSearch API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="280" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Source Extractor Service -->
+        <mxCell id="source-extractor" value="source-extractor&#xa;Service&#xa;&#xa;• Fetches from JSearch API&#xa;• Writes to raw schema" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="280" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- JSearch API -->
+        <mxCell id="jsearch-api" value="JSearch API&#xa;(External)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="400" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Normalize Task -->
+        <mxCell id="normalize" value="normalize&#xa;Normalize to Canonical Format" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="380" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Normalizer Service -->
+        <mxCell id="normalizer" value="normalizer&#xa;Service&#xa;&#xa;• Maps provider fields&#xa;• Type coercion&#xa;• Enum mapping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="380" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Enrich Task -->
+        <mxCell id="enrich" value="enrich&#xa;Enrich with Skills, Titles, Locations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="480" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Enricher Service -->
+        <mxCell id="enricher" value="enricher&#xa;Service&#xa;&#xa;• Skills extraction (spaCy)&#xa;• Title standardization&#xa;• Location normalization&#xa;• Salary to CAD" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="480" width="200" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- dbt Models Core Task -->
+        <mxCell id="dbt-models" value="dbt_models_core&#xa;Build Dimensions &amp; Facts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="580" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Dedupe Task -->
+        <mxCell id="dedupe" value="dedupe_consolidate&#xa;Deduplicate by hash_key" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="680" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Rank Task -->
+        <mxCell id="rank" value="rank&#xa;Rank Jobs by Score" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="780" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Ranker Service -->
+        <mxCell id="ranker" value="ranker&#xa;Service&#xa;&#xa;• Reads config/ranking.yml&#xa;• Calculates rank_score (0-100)&#xa;• Generates rank_explain JSON" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="780" width="200" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- dbt Tests Task -->
+        <mxCell id="dbt-tests" value="dbt_tests&#xa;Data Quality Tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="880" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Publish Hyper Task -->
+        <mxCell id="publish" value="publish_hyper&#xa;Export to Tableau Hyper" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="980" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Publisher Hyper Service -->
+        <mxCell id="publisher-hyper" value="publisher-hyper&#xa;Service&#xa;&#xa;• Exports fact_jobs&#xa;• Exports dim_companies&#xa;• Creates .hyper files" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="980" width="200" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Notify Task -->
+        <mxCell id="notify" value="notify_daily&#xa;Send Summary Email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="700" y="1080" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- SMTP -->
+        <mxCell id="smtp" value="SMTP Server&#xa;(Email)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="1000" y="1080" width="200" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- End Task -->
+        <mxCell id="end" value="END" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="1180" width="200" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Database Section -->
+        <mxCell id="db-title" value="PostgreSQL Database" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="280" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Raw Schema -->
+        <mxCell id="raw-schema" value="raw Schema&#xa;&#xa;job_postings_raw&#xa;• raw_id (uuid)&#xa;• source (text)&#xa;• payload (jsonb)&#xa;• collected_at (timestamptz)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="320" width="200" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- Staging Schema -->
+        <mxCell id="staging-schema" value="staging Schema&#xa;&#xa;job_postings_stg&#xa;• hash_key (text PK)&#xa;• job_title, company&#xa;• location, remote_type&#xa;• contract_type, seniority&#xa;• salary_min/max/currency&#xa;• skills_raw, description&#xa;• first_seen_at, last_seen_at" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="480" width="200" height="180" as="geometry" />
+        </mxCell>
+        
+        <!-- Marts Schema -->
+        <mxCell id="marts-schema" value="marts Schema&#xa;&#xa;dim_companies&#xa;• company_id (PK)&#xa;• company, company_size&#xa;&#xa;fact_jobs&#xa;• job_id (PK)&#xa;• hash_key (unique)&#xa;• job_title_std&#xa;• company_id (FK)&#xa;• location_std, lat/lon&#xa;• skills (text[])&#xa;• salary_min/max_norm (CAD)&#xa;• rank_score (0-100)&#xa;• rank_explain (jsonb)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="700" width="200" height="280" as="geometry" />
+        </mxCell>
+        
+        <!-- Tableau -->
+        <mxCell id="tableau" value="Tableau&#xa;.hyper Files&#xa;&#xa;• Ranked List Dashboard&#xa;• Skills Coverage&#xa;• Source Quality" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="1020" width="200" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows: Airflow Flow -->
+        <mxCell id="arrow1" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="airflow" target="start">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="200" as="sourcePoint" />
+            <mxPoint x="850" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow2" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="start" target="extract">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="280" as="sourcePoint" />
+            <mxPoint x="850" y="230" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow3" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="extract" target="normalize">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="380" as="sourcePoint" />
+            <mxPoint x="850" y="330" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow4" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="normalize" target="enrich">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="480" as="sourcePoint" />
+            <mxPoint x="850" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow5" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="enrich" target="dbt-models">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="580" as="sourcePoint" />
+            <mxPoint x="850" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow6" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="dbt-models" target="dedupe">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="680" as="sourcePoint" />
+            <mxPoint x="850" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow7" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="dedupe" target="rank">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="780" as="sourcePoint" />
+            <mxPoint x="850" y="730" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow8" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="rank" target="dbt-tests">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="880" as="sourcePoint" />
+            <mxPoint x="850" y="830" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow9" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="dbt-tests" target="publish">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="980" as="sourcePoint" />
+            <mxPoint x="850" y="930" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow10" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="publish" target="notify">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="1080" as="sourcePoint" />
+            <mxPoint x="850" y="1030" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow11" value="" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1" source="notify" target="end">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="1180" as="sourcePoint" />
+            <mxPoint x="850" y="1130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Arrows: Service Connections -->
+        <mxCell id="arrow-extract-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="extract" target="source-extractor">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="310" as="sourcePoint" />
+            <mxPoint x="1000" y="320" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-extract-api" value="fetches" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#b85450;dashed=1" edge="1" parent="1" source="source-extractor" target="jsearch-api">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1100" y="360" as="sourcePoint" />
+            <mxPoint x="1100" y="400" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-extract-raw" value="writes" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="source-extractor" target="raw-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="320" as="sourcePoint" />
+            <mxPoint x="400" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-normalize-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="normalize" target="normalizer">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="410" as="sourcePoint" />
+            <mxPoint x="1000" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-normalize-staging" value="writes" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="normalizer" target="staging-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="420" as="sourcePoint" />
+            <mxPoint x="400" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-enrich-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="enrich" target="enricher">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="510" as="sourcePoint" />
+            <mxPoint x="1000" y="530" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-rank-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="rank" target="ranker">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="810" as="sourcePoint" />
+            <mxPoint x="1000" y="830" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-rank-marts" value="updates" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="ranker" target="marts-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="830" as="sourcePoint" />
+            <mxPoint x="400" y="840" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-publish-service" value="calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1" source="publish" target="publisher-hyper">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="1010" as="sourcePoint" />
+            <mxPoint x="1000" y="1030" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-publish-tableau" value="exports" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#b85450;dashed=1" edge="1" parent="1" source="publisher-hyper" target="tableau">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1000" y="1030" as="sourcePoint" />
+            <mxPoint x="400" y="1080" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-publish-marts" value="reads" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="marts-schema" target="publisher-hyper">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="840" as="sourcePoint" />
+            <mxPoint x="1000" y="1030" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-notify-smtp" value="sends" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#b85450;dashed=1" edge="1" parent="1" source="notify" target="smtp">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="900" y="1110" as="sourcePoint" />
+            <mxPoint x="1000" y="1105" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Data Flow: Raw to Staging -->
+        <mxCell id="arrow-raw-staging" value="reads" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="raw-schema" target="normalizer">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="380" as="sourcePoint" />
+            <mxPoint x="1000" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Data Flow: Staging to Marts (via dbt) -->
+        <mxCell id="arrow-staging-marts" value="dbt transforms" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="staging-schema" target="marts-schema">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="660" as="sourcePoint" />
+            <mxPoint x="400" y="700" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="1200" width="1000" height="200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-title" value="Legend" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="1210" width="100" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-airflow" value="Airflow Tasks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="220" y="1250" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-services" value="Microservices" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="360" y="1250" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-db" value="Database Schemas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="500" y="1250" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-external" value="External Systems" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="640" y="1250" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-flow" value="Main Flow" style="endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#1ba1e2" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="1265" as="sourcePoint" />
+            <mxPoint x="850" y="1265" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="legend-flow-text" value="Main Flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="860" y="1255" width="80" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-service" value="Service Calls" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#9673a6;dashed=1" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="1295" as="sourcePoint" />
+            <mxPoint x="850" y="1295" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="legend-service-text" value="Service Calls" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="860" y="1285" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-data" value="Data Flow" style="endArrow=classic;html=1;rounded=0;strokeWidth=1.5;strokeColor=#82b366;dashed=1" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="800" y="1325" as="sourcePoint" />
+            <mxPoint x="850" y="1325" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="legend-data-text" value="Data Flow" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10" vertex="1" parent="1">
+          <mxGeometry x="860" y="1315" width="100" height="20" as="geometry" />
+        </mxCell>
+        
+        <!-- Notes -->
+        <mxCell id="notes" value="Notes:&#xa;• Schedule: Daily at 07:00 America/Toronto&#xa;• All tasks are idempotent (upsert by hash_key)&#xa;• hash_key = md5(company|title|location)&#xa;• Retries: 3 for API calls, 2 for others&#xa;• Email notification runs even on failure (trigger_rule=all_done)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="200" y="1450" width="1000" height="120" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+
