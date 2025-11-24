@@ -768,8 +768,7 @@ def enrich_data(**context):
         raise
 
 
-def rank_jobs(**context):nri
-
+def rank_jobs(**context):
     """
     Rank jobs based on configurable weights and profile.
 
