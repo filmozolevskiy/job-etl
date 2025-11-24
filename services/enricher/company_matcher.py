@@ -87,8 +87,9 @@ class CompanyMatcher:
         for suffix_pattern in COMPANY_SUFFIXES:
             normalized = re.sub(suffix_pattern, "", normalized, flags=re.IGNORECASE)
 
-        # Remove extra whitespace
+        # Remove extra whitespace and trailing punctuation
         normalized = re.sub(r"\s+", " ", normalized).strip()
+        normalized = re.sub(r"\s*[.\s]+\s*$", "", normalized).strip()  # Remove trailing periods/spaces
 
         return normalized
 

@@ -94,30 +94,23 @@ class GlassdoorClient:
             )
 
             # Handle HTTP errors with specific logging and custom messages
-            try:
-                response.raise_for_status()
-            except requests.exceptions.HTTPError as err:
-                # Log specific error messages
-                if response.status_code == 401:
-                    logger.error("Invalid API key - check GLASSDOOR_API_KEY")
-                    raise requests.exceptions.HTTPError(
-                        "Invalid API key - check GLASSDOOR_API_KEY", response=response
-                    ) from err
-                elif response.status_code == 429:
-                    logger.error("Rate limit exceeded - too many API calls")
-                    raise requests.exceptions.HTTPError(
-                        "Rate limit exceeded - too many API calls", response=response
-                    ) from err
-                elif response.status_code >= 400:
-                    logger.error(
-                        "API error %s: %s", response.status_code, response.text[:200]
-                    )
-                    raise requests.exceptions.HTTPError(
-                        f"API error {response.status_code}: {response.text[:200]}",
-                        response=response,
-                    ) from err
-                # Re-raise if not handled above
-                raise
+            if response.status_code == 401:
+                logger.error("Invalid API key - check GLASSDOOR_API_KEY")
+                raise requests.exceptions.HTTPError(
+                    "Invalid API key - check GLASSDOOR_API_KEY"
+                )
+            elif response.status_code == 429:
+                logger.error("Rate limit exceeded - too many API calls")
+                raise requests.exceptions.HTTPError(
+                    "Rate limit exceeded - too many API calls"
+                )
+            elif response.status_code >= 400:
+                logger.error(
+                    "API error %s: %s", response.status_code, response.text[:200]
+                )
+                raise requests.exceptions.HTTPError(
+                    f"API error {response.status_code}: {response.text[:200]}"
+                )
 
             try:
                 data = response.json()
