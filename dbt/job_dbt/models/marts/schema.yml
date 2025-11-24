@@ -11,16 +11,37 @@ models:
           - not_null
       
       - name: company
-        description: "Company name"
+        description: "Company name (prefer enriched from Glassdoor, fallback to staging)"
         tests:
           - not_null
       
+      - name: rating
+        description: "Overall company rating from Glassdoor (0-5)"
+      
       - name: company_size
-        description: "Company size bucket"
+        description: "Company size bucket (prefer enriched from Glassdoor, fallback to staging)"
         tests:
           - not_null
           - accepted_values:
               values: ['1-10', '11-50', '51-200', '201-500', '501-1000', '1001-5000', '5001+', 'unknown']
+      
+      - name: year_founded
+        description: "Year company was founded (from Glassdoor)"
+      
+      - name: company_type
+        description: "Type of company from Glassdoor (e.g., 'Company - Private')"
+      
+      - name: company_link
+        description: "Link to company page on Glassdoor"
+      
+      - name: compensation_and_benefits_rating
+        description: "Compensation and benefits rating from Glassdoor (0-5)"
+      
+      - name: work_life_balance_rating
+        description: "Work-life balance rating from Glassdoor (0-5)"
+      
+      - name: office_locations
+        description: "Office locations as JSONB array from Glassdoor. Structure: [{'city': 'City, State', 'country': 'Country'}, ...]"
       
       - name: source_first_seen
         description: "First source where this company was observed"

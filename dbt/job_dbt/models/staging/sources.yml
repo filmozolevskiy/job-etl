@@ -29,4 +29,32 @@ sources:
             description: "Source provider"
             tests:
               - not_null
+      - name: companies_stg
+        description: "Enriched company data from Glassdoor API"
+        columns:
+          - name: company_id
+            description: "Primary key (MD5 hash of normalized company name)"
+            tests:
+              - unique
+              - not_null
+          - name: glassdoor_company_id
+            description: "Glassdoor's company ID from API"
+          - name: name
+            description: "Company name from Glassdoor API"
+          - name: rating
+            description: "Overall company rating"
+          - name: company_size
+            description: "Company size category"
+          - name: year_founded
+            description: "Year company was founded"
+          - name: company_type
+            description: "Type of company (e.g., 'Company - Private')"
+          - name: company_link
+            description: "Link to company page on Glassdoor"
+          - name: compensation_and_benefits_rating
+            description: "Compensation and benefits rating"
+          - name: work_life_balance_rating
+            description: "Work-life balance rating"
+          - name: office_locations
+            description: "Office locations as JSONB array"
 

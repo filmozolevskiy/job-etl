@@ -10,4 +10,10 @@ spacy>=3.7,<3.8
 pyyaml>=6.0
 python-dotenv==1.0.0
 
+# Fuzzy string matching for company name matching
+rapidfuzz>=3.0.0
+
+# HTTP requests for API calls
+requests>=2.31.0
+
 

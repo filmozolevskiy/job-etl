@@ -16,6 +16,8 @@ tableauhyperapi
 # Enricher service dependencies (skills extraction)
 spacy>=3.7,<3.8
 pyyaml>=6.0
+rapidfuzz>=3.0.0  # Fuzzy string matching for company name matching
+requests>=2.31.0  # HTTP requests for Glassdoor API
 
 # HTTP requests (already included in Airflow)
 # requests==2.31.0

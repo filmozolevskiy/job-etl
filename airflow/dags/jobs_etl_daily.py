@@ -689,7 +689,9 @@ def enrich_data(**context):
     print("=" * 60)
 
     try:
+        from services.enricher.company_matcher import CompanyMatcher
         from services.enricher.db_operations import EnricherDB
+        from services.enricher.glassdoor_client import GlassdoorClient
         from services.enricher.main import run_enricher
         from services.enricher.skills_extractor import (
             SkillsExtractor,
@@ -708,6 +710,21 @@ def enrich_data(**context):
         extractor = SkillsExtractor(dictionary=dictionary)
         db = EnricherDB(database_url)
 
+        # Initialize company enrichment if API key is available
+        matcher = None
+        glassdoor_api_key = _get_airflow_var('GLASSDOOR_API_KEY')
+        if glassdoor_api_key:
+            try:
+                glassdoor_client = GlassdoorClient(api_key=glassdoor_api_key)
+                matcher = CompanyMatcher(glassdoor_client=glassdoor_client)
+                print("Company enrichment enabled")
+            except Exception as e:
+                print(f"Warning: Failed to initialize company enrichment: {e}")
+                print("Continuing without company enrichment")
+                matcher = None
+        else:
+            print("GLASSDOOR_API_KEY not set; skipping company enrichment")
+
         ti = context['ti']
         normalize_result = ti.xcom_pull(task_ids='normalize', default={})
         source_filter = normalize_result.get('source')
@@ -719,6 +736,8 @@ def enrich_data(**context):
             sources=sources,
             include_existing=False,
             dry_run=False,
+            enrich_companies=matcher is not None,
+            matcher=matcher,
         )
 
         print("Enrichment results:")
@@ -726,11 +745,17 @@ def enrich_data(**context):
         print(f"  - processed: {stats['processed']}")
         print(f"  - updated:   {stats['updated']}")
         print(f"  - unchanged: {stats['unchanged']}")
+        if matcher:
+            print(f"  - companies_fetched:   {stats.get('companies_fetched', 0)}")
+            print(f"  - companies_enriched:  {stats.get('companies_enriched', 0)}")
+            print(f"  - companies_skipped:   {stats.get('companies_skipped', 0)}")
+            print(f"  - companies_errors:    {stats.get('companies_errors', 0)}")
         print("=" * 60)
 
         return {
             "enriched_count": stats["updated"],
             "enriched_processed": stats["processed"],
+            "companies_enriched": stats.get("companies_enriched", 0),
         }
 
     except Exception as e:
@@ -1278,9 +1303,10 @@ with DAG(
         **Enrich job postings**
 
         - Extract skills using NLP (spaCy + keyword lists)
-        - Standardize job titles via taxonomy
-        - Normalize locations and salaries to CAD
-        - Map company sizes to standard bins
+        - Enrich companies with Glassdoor API data (ratings, size, year founded, etc.)
+        - Uses fuzzy matching to match company names to Glassdoor API results
+        - Updates staging.job_postings_stg with skills
+        - Updates staging.companies_stg with enriched company data
         """
     )
 
