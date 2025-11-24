@@ -110,8 +110,9 @@ jobs:
           pip install psycopg2-binary sqlalchemy
           # Install service dependencies
           pip install requests pydantic python-dotenv pyyaml
-          # Install enricher service dependencies (spaCy for skills extraction)
+          # Install enricher service dependencies (spaCy for skills extraction, rapidfuzz for company matching)
           pip install "spacy>=3.7,<3.8"
+          pip install "rapidfuzz>=3.0.0"
       
       # Step 3b: Initialize database tables with retry logic
       - name: Bootstrap database

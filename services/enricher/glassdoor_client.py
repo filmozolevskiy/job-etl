@@ -114,7 +114,7 @@ class GlassdoorClient:
 
             try:
                 data = response.json()
-            except ValueError as exc:
+            except ValueError:
                 logger.error(
                     "Failed to parse JSON response",
                     extra={"query": query, "response_text": response.text[:500]},
@@ -170,7 +170,7 @@ class GlassdoorClient:
                             },
                         )
                         return companies
-            
+
             # Log what we actually got
             logger.warning(
                 "API response missing 'data' field",
