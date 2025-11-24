@@ -19,13 +19,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_SIMILARITY_THRESHOLD = 80
 
 # Common company suffixes to remove during normalization
+# Note: "Company" is not included as it's often part of the actual company name
 COMPANY_SUFFIXES = [
     r"\bInc\.?\b",
     r"\bLLC\.?\b",
     r"\bLtd\.?\b",
     r"\bCorp\.?\b",
     r"\bCorporation\b",
-    r"\bCompany\b",
     r"\bCo\.?\b",
     r"\bLP\.?\b",
     r"\bLLP\.?\b",
