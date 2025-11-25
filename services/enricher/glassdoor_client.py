@@ -183,7 +183,12 @@ class GlassdoorClient:
             )
             return []
 
+        except requests.exceptions.HTTPError:
+            # Re-raise HTTPError (401, 429, 400+) - these should propagate to caller
+            raise
         except requests.exceptions.RequestException as exc:
+            # Catch other request exceptions (ConnectionError, Timeout, etc.)
+            # and return empty list per requirement 4c
             logger.error(
                 "Glassdoor API request failed",
                 extra={"query": query, "error": str(exc)},
