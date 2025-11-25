@@ -94,6 +94,7 @@ class GlassdoorClient:
             )
 
             # Handle HTTP errors with specific logging and custom messages
+            # Pattern matches jsearch_adapter.py for consistency
             if response.status_code == 401:
                 logger.error("Invalid API key - check GLASSDOOR_API_KEY")
                 raise requests.exceptions.HTTPError(
