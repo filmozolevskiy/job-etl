@@ -1,4 +1,4 @@
-﻿"""
+"""
 Job-ETL Daily DAG
 
 This DAG orchestrates the daily ETL pipeline for job postings:
@@ -14,6 +14,7 @@ This DAG orchestrates the daily ETL pipeline for job postings:
 
 Schedule: Daily at 07:00 America/Toronto
 """
+
 from datetime import datetime, timedelta, timezone
 import os
 from typing import Optional
@@ -48,7 +49,7 @@ def _get_airflow_var(name: str, default: Optional[str] = None) -> Optional[str]:
         return os.getenv(name, default)
 
 
-def _get_database_url(connection_id: str = 'postgres_default') -> str:
+def _get_database_url(connection_id: str = "postgres_default") -> str:
     """
     Get database URL from Airflow connection with fallback to environment variables.
 
@@ -70,47 +71,49 @@ def _get_database_url(connection_id: str = 'postgres_default') -> str:
         conn = BaseHook.get_connection(connection_id)
         # Build connection string manually to ensure host is included
         # This prevents psycopg2 from defaulting to Unix socket
-        conn_host = conn.host or 'postgres'
+        conn_host = conn.host or "postgres"
         conn_port = conn.port or 5432
-        conn_schema = conn.schema or 'job_etl'
-        conn_login = conn.login or 'job_etl_user'
-        conn_password = conn.password or ''
+        conn_schema = conn.schema or "job_etl"
+        conn_login = conn.login or "job_etl_user"
+        conn_password = conn.password or ""
 
         # If password is empty, try to read from secret file
         if not conn_password:
-            secret_path = '/run/secrets/postgres_password'
+            secret_path = "/run/secrets/postgres_password"
             if os.path.exists(secret_path):
                 try:
-                    with open(secret_path, encoding='utf-8') as f:
+                    with open(secret_path, encoding="utf-8") as f:
                         conn_password = f.read().strip()
                 except UnicodeDecodeError:
-                    with open(secret_path, encoding='utf-16') as f:
+                    with open(secret_path, encoding="utf-16") as f:
                         conn_password = f.read().strip()
 
-        database_url = f"postgresql://{conn_login}:{conn_password}@{conn_host}:{conn_port}/{conn_schema}"
+        database_url = (
+            f"postgresql://{conn_login}:{conn_password}@{conn_host}:{conn_port}/{conn_schema}"
+        )
         print(f"Using Airflow connection: {connection_id} (host: {conn_host})")
         return database_url
     except Exception as e:
         print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
         # Try DATABASE_URL first
-        database_url = os.getenv('DATABASE_URL')
+        database_url = os.getenv("DATABASE_URL")
         # If not set, build from individual components
         if not database_url:
-            db_host = os.getenv('POSTGRES_HOST', 'postgres')
-            db_port = os.getenv('POSTGRES_PORT', '5432')
-            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-            db_password = os.getenv('POSTGRES_PASSWORD')
-            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+            db_host = os.getenv("POSTGRES_HOST", "postgres")
+            db_port = os.getenv("POSTGRES_PORT", "5432")
+            db_user = os.getenv("POSTGRES_USER", "job_etl_user")
+            db_password = os.getenv("POSTGRES_PASSWORD")
+            db_name = os.getenv("POSTGRES_DB", "job_etl")
 
             # Try to read password from secret file if available
             if not db_password:
-                secret_path = '/run/secrets/postgres_password'
+                secret_path = "/run/secrets/postgres_password"
                 if os.path.exists(secret_path):
                     try:
-                        with open(secret_path, encoding='utf-8') as f:
+                        with open(secret_path, encoding="utf-8") as f:
                             db_password = f.read().strip()
                     except UnicodeDecodeError:
-                        with open(secret_path, encoding='utf-16') as f:
+                        with open(secret_path, encoding="utf-16") as f:
                             db_password = f.read().strip()
 
             if db_password:
@@ -150,6 +153,7 @@ default_args = {
 # Task Callable Functions
 # -----------------------------------------------------------------------------
 
+
 def run_dbt_models(models: str, **context):
     """
     Run dbt models with the specified selection.
@@ -168,44 +172,44 @@ def run_dbt_models(models: str, **context):
     try:
         # Get database credentials from Airflow connection
         try:
-            conn = BaseHook.get_connection('postgres_default')
-            db_host = conn.host or 'postgres'  # Default to 'postgres' for Docker service name
+            conn = BaseHook.get_connection("postgres_default")
+            db_host = conn.host or "postgres"  # Default to 'postgres' for Docker service name
             db_port = conn.port or 5432
-            db_user = conn.login or 'job_etl_user'
-            db_password = conn.password or ''
-            db_name = conn.schema or 'job_etl'  # In Airflow connection, schema is the database name
+            db_user = conn.login or "job_etl_user"
+            db_password = conn.password or ""
+            db_name = conn.schema or "job_etl"  # In Airflow connection, schema is the database name
 
             # If password is empty, try to read from secret file
             if not db_password:
-                secret_path = '/run/secrets/postgres_password'
+                secret_path = "/run/secrets/postgres_password"
                 if os.path.exists(secret_path):
                     try:
-                        with open(secret_path, encoding='utf-8') as f:
+                        with open(secret_path, encoding="utf-8") as f:
                             db_password = f.read().strip()
                     except UnicodeDecodeError:
-                        with open(secret_path, encoding='utf-16') as f:
+                        with open(secret_path, encoding="utf-16") as f:
                             db_password = f.read().strip()
 
             print(f"Using Airflow connection: postgres_default (host: {db_host})")
         except Exception as e:
             print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            db_host = os.getenv('POSTGRES_HOST', 'postgres')
-            db_port = os.getenv('POSTGRES_PORT', '5432')
-            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-            db_password = os.getenv('POSTGRES_PASSWORD')
-            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+            db_host = os.getenv("POSTGRES_HOST", "postgres")
+            db_port = os.getenv("POSTGRES_PORT", "5432")
+            db_user = os.getenv("POSTGRES_USER", "job_etl_user")
+            db_password = os.getenv("POSTGRES_PASSWORD")
+            db_name = os.getenv("POSTGRES_DB", "job_etl")
 
             # Try to read password from secret file if available
             if not db_password:
-                secret_path = '/run/secrets/postgres_password'
+                secret_path = "/run/secrets/postgres_password"
                 if os.path.exists(secret_path):
                     try:
                         # Try UTF-8 first, then UTF-16 if that fails
-                        with open(secret_path, encoding='utf-8') as f:
+                        with open(secret_path, encoding="utf-8") as f:
                             db_password = f.read().strip()
                     except UnicodeDecodeError:
                         # Fallback to UTF-16 (Windows might create files in UTF-16)
-                        with open(secret_path, encoding='utf-16') as f:
+                        with open(secret_path, encoding="utf-16") as f:
                             db_password = f.read().strip()
 
             if not db_password:
@@ -215,10 +219,10 @@ def run_dbt_models(models: str, **context):
                 ) from None
 
         # Set up dbt environment
-        project_dir = '/opt/airflow/dbt/job_dbt'
-        profiles_dir = '/tmp/dbt_profiles'
-        target_path = '/tmp/dbt_target'
-        log_path = '/tmp/dbt_logs'
+        project_dir = "/opt/airflow/dbt/job_dbt"
+        profiles_dir = "/tmp/dbt_profiles"
+        target_path = "/tmp/dbt_target"
+        log_path = "/tmp/dbt_logs"
 
         # Create temporary directories
         os.makedirs(profiles_dir, exist_ok=True)
@@ -244,30 +248,29 @@ def run_dbt_models(models: str, **context):
                 connect_timeout: 10
                 search_path: "staging,raw,marts,public"
 """
-        with open(f'{profiles_dir}/profiles.yml', 'w') as f:
+        with open(f"{profiles_dir}/profiles.yml", "w") as f:
             f.write(profiles_yml)
 
         # Run dbt command
         # Build dbt command using separate selectors to ensure matching
         selectors = models.split()
         cmd = [
-            'dbt',
-            'run',
-            '--select',
+            "dbt",
+            "run",
+            "--select",
             *selectors,
-            '--project-dir', project_dir,
-            '--profiles-dir', profiles_dir,
-            '--target-path', target_path,
-            '--log-path', log_path
+            "--project-dir",
+            project_dir,
+            "--profiles-dir",
+            profiles_dir,
+            "--target-path",
+            target_path,
+            "--log-path",
+            log_path,
         ]
 
         print(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
         print(result.stdout)
         if result.stderr:
@@ -322,44 +325,44 @@ def run_dbt_tests(**context):
     try:
         # Get database credentials from Airflow connection
         try:
-            conn = BaseHook.get_connection('postgres_default')
-            db_host = conn.host or 'postgres'  # Default to 'postgres' for Docker service name
+            conn = BaseHook.get_connection("postgres_default")
+            db_host = conn.host or "postgres"  # Default to 'postgres' for Docker service name
             db_port = conn.port or 5432
-            db_user = conn.login or 'job_etl_user'
-            db_password = conn.password or ''
-            db_name = conn.schema or 'job_etl'  # In Airflow connection, schema is the database name
+            db_user = conn.login or "job_etl_user"
+            db_password = conn.password or ""
+            db_name = conn.schema or "job_etl"  # In Airflow connection, schema is the database name
 
             # If password is empty, try to read from secret file
             if not db_password:
-                secret_path = '/run/secrets/postgres_password'
+                secret_path = "/run/secrets/postgres_password"
                 if os.path.exists(secret_path):
                     try:
-                        with open(secret_path, encoding='utf-8') as f:
+                        with open(secret_path, encoding="utf-8") as f:
                             db_password = f.read().strip()
                     except UnicodeDecodeError:
-                        with open(secret_path, encoding='utf-16') as f:
+                        with open(secret_path, encoding="utf-16") as f:
                             db_password = f.read().strip()
 
             print(f"Using Airflow connection: postgres_default (host: {db_host})")
         except Exception as e:
             print(f"Warning: Could not get Airflow connection, trying environment variables: {e}")
-            db_host = os.getenv('POSTGRES_HOST', 'postgres')
-            db_port = os.getenv('POSTGRES_PORT', '5432')
-            db_user = os.getenv('POSTGRES_USER', 'job_etl_user')
-            db_password = os.getenv('POSTGRES_PASSWORD')
-            db_name = os.getenv('POSTGRES_DB', 'job_etl')
+            db_host = os.getenv("POSTGRES_HOST", "postgres")
+            db_port = os.getenv("POSTGRES_PORT", "5432")
+            db_user = os.getenv("POSTGRES_USER", "job_etl_user")
+            db_password = os.getenv("POSTGRES_PASSWORD")
+            db_name = os.getenv("POSTGRES_DB", "job_etl")
 
             # Try to read password from secret file if available
             if not db_password:
-                secret_path = '/run/secrets/postgres_password'
+                secret_path = "/run/secrets/postgres_password"
                 if os.path.exists(secret_path):
                     try:
                         # Try UTF-8 first, then UTF-16 if that fails
-                        with open(secret_path, encoding='utf-8') as f:
+                        with open(secret_path, encoding="utf-8") as f:
                             db_password = f.read().strip()
                     except UnicodeDecodeError:
                         # Fallback to UTF-16 (Windows might create files in UTF-16)
-                        with open(secret_path, encoding='utf-16') as f:
+                        with open(secret_path, encoding="utf-16") as f:
                             db_password = f.read().strip()
 
             if not db_password:
@@ -369,10 +372,10 @@ def run_dbt_tests(**context):
                 ) from None
 
         # Set up dbt environment
-        project_dir = '/opt/airflow/dbt/job_dbt'
-        profiles_dir = '/tmp/dbt_profiles'
-        target_path = '/tmp/dbt_target'
-        log_path = '/tmp/dbt_logs'
+        project_dir = "/opt/airflow/dbt/job_dbt"
+        profiles_dir = "/tmp/dbt_profiles"
+        target_path = "/tmp/dbt_target"
+        log_path = "/tmp/dbt_logs"
 
         # Create temporary directories
         os.makedirs(profiles_dir, exist_ok=True)
@@ -398,26 +401,25 @@ def run_dbt_tests(**context):
                 connect_timeout: 10
                 search_path: "staging,raw,marts,public"
 """
-        with open(f'{profiles_dir}/profiles.yml', 'w') as f:
+        with open(f"{profiles_dir}/profiles.yml", "w") as f:
             f.write(profiles_yml)
 
         # Run dbt test command
         cmd = [
-            'dbt',
-            'test',
-            '--project-dir', project_dir,
-            '--profiles-dir', profiles_dir,
-            '--target-path', target_path,
-            '--log-path', log_path
+            "dbt",
+            "test",
+            "--project-dir",
+            project_dir,
+            "--profiles-dir",
+            profiles_dir,
+            "--target-path",
+            target_path,
+            "--log-path",
+            log_path,
         ]
 
         print(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
         print(result.stdout)
         if result.stderr:
@@ -464,7 +466,7 @@ def extract_source_jsearch(**context):
     from airflow.hooks.base import BaseHook
 
     # Ensure project root is on sys.path to import services
-    project_root = '/opt/airflow'
+    project_root = "/opt/airflow"
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
@@ -481,7 +483,7 @@ def extract_source_jsearch(**context):
         from services.source_extractor.source_config import load_sources_config
 
         # Resolve database URL from Airflow connection with fallback to env
-        database_url = _get_database_url('postgres_default')
+        database_url = _get_database_url("postgres_default")
 
         # Load provider configuration (non-secret params)
         config = load_sources_config()
@@ -493,29 +495,25 @@ def extract_source_jsearch(**context):
             return {"source": "jsearch", "extracted_count": 0}
 
         # Resolve API configuration from Airflow Variables with env fallbacks
-        jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
-        jsearch_base_url = _get_airflow_var('JSEARCH_BASE_URL', 'https://api.openwebninja.com')
+        jsearch_api_key = _get_airflow_var("JSEARCH_API_KEY")
+        jsearch_base_url = _get_airflow_var("JSEARCH_BASE_URL", "https://api.openwebninja.com")
         config_params = provider_config.params
 
         jsearch_query = _get_airflow_var(
-            'JSEARCH_QUERY', config_params.get('query', 'analytics engineer')
+            "JSEARCH_QUERY", config_params.get("query", "analytics engineer")
         )
-        jsearch_country = _get_airflow_var(
-            'JSEARCH_COUNTRY', config_params.get('country', 'us')
-        )
+        jsearch_country = _get_airflow_var("JSEARCH_COUNTRY", config_params.get("country", "us"))
         jsearch_date_posted = _get_airflow_var(
-            'JSEARCH_DATE_POSTED', config_params.get('date_posted', 'month')
+            "JSEARCH_DATE_POSTED", config_params.get("date_posted", "month")
         )
 
         try:
             jsearch_max_jobs = int(
-                _get_airflow_var(
-                    'JSEARCH_MAX_JOBS', str(config_params.get('max_jobs', '20'))
-                )
-                or '20'
+                _get_airflow_var("JSEARCH_MAX_JOBS", str(config_params.get("max_jobs", "20")))
+                or "20"
             )
         except ValueError:
-            jsearch_max_jobs = int(config_params.get('max_jobs', 20))
+            jsearch_max_jobs = int(config_params.get("max_jobs", 20))
 
         if not jsearch_api_key:
             raise ValueError(
@@ -586,7 +584,7 @@ def normalize_data(**context):
     from airflow.hooks.base import BaseHook
 
     # Add project root to path so we can import services
-    project_root = '/opt/airflow'
+    project_root = "/opt/airflow"
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
@@ -600,7 +598,7 @@ def normalize_data(**context):
         from services.normalizer.main import run_normalizer
 
         # Get database URL from Airflow connection with fallback to env
-        database_url = _get_database_url('postgres_default')
+        database_url = _get_database_url("postgres_default")
 
         print("Connecting to database...")
 
@@ -608,28 +606,47 @@ def normalize_data(**context):
         db = NormalizerDB(database_url)
 
         # Get API key from Airflow Variables for adapter initialization
-        jsearch_api_key = _get_airflow_var('JSEARCH_API_KEY')
+        jsearch_api_key = _get_airflow_var("JSEARCH_API_KEY")
         if jsearch_api_key:
             # Set environment variable so JSearchAdapter can read it
-            os.environ['JSEARCH_API_KEY'] = jsearch_api_key
+            os.environ["JSEARCH_API_KEY"] = jsearch_api_key
             print("JSEARCH_API_KEY set from Airflow Variable")
         else:
             print("Warning: JSEARCH_API_KEY not found in Airflow Variables or environment")
 
         # Run normalizer service
         # Filter by source if provided via XCom from extract task
-        ti = context['ti']
-        extract_result = ti.xcom_pull(task_ids='extract_jsearch')
-        source_filter = extract_result.get('source') if extract_result else 'jsearch'
+        ti = context["ti"]
+        extract_result = ti.xcom_pull(task_ids="extract_jsearch")
+        source_filter = extract_result.get("source") if extract_result else "jsearch"
+
+        # Filter by execution date to only process jobs from current run
+        # This ensures incremental processing instead of reprocessing all historical jobs
+        dag_run = context.get("dag_run")
+        min_collected_at = None
+        if dag_run and dag_run.execution_date:
+            # Get execution date in Toronto timezone
+            execution_date_local = pendulum.instance(dag_run.execution_date).in_timezone(TZ)
+            # Start from beginning of execution date (subtract 1 hour for safety margin)
+            filter_time_local = execution_date_local.start_of("day").subtract(hours=1)
+            filter_time_utc = filter_time_local.in_timezone("UTC")
+            min_collected_at = filter_time_utc.isoformat()
+            print(
+                f"Filtering to jobs collected on/after: "
+                f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                f"({filter_time_utc.to_datetime_string()} UTC)"
+            )
+        else:
+            print("Warning: No execution_date available; processing all raw jobs (not incremental)")
 
         print(f"Normalizing jobs from source: {source_filter}")
 
         stats = run_normalizer(
             db=db,
             source=source_filter,
-            limit=None,  # Process all available raw jobs
-            min_collected_at=None,  # Process all timestamps
-            dry_run=False
+            limit=None,  # Process all available raw jobs (filtered by date)
+            min_collected_at=min_collected_at,  # Filter by execution date for incremental processing
+            dry_run=False,
         )
 
         print("=" * 60)
@@ -645,10 +662,10 @@ def normalize_data(**context):
 
         # Return stats for downstream tasks via XCom
         return {
-            "normalized_count": stats['normalized'],
-            "upserted_count": stats['upserted'],
-            "failed_count": stats['failed'],
-            "source": source_filter
+            "normalized_count": stats["normalized"],
+            "upserted_count": stats["upserted"],
+            "failed_count": stats["failed"],
+            "source": source_filter,
         }
 
     except DatabaseError as e:
@@ -680,7 +697,7 @@ def enrich_data(**context):
     """
     import sys
 
-    project_root = '/opt/airflow'
+    project_root = "/opt/airflow"
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
@@ -698,11 +715,11 @@ def enrich_data(**context):
             load_skills_dictionary,
         )
 
-        database_url = _get_database_url('postgres_default')
+        database_url = _get_database_url("postgres_default")
 
         print("Connecting to database for enrichment")
 
-        dictionary_path = _get_airflow_var('SKILLS_DICTIONARY_PATH')
+        dictionary_path = _get_airflow_var("SKILLS_DICTIONARY_PATH")
         if dictionary_path:
             print(f"Loading skills dictionary from: {dictionary_path}")
 
@@ -712,7 +729,7 @@ def enrich_data(**context):
 
         # Initialize company enrichment if API key is available
         matcher = None
-        glassdoor_api_key = _get_airflow_var('GLASSDOOR_API_KEY')
+        glassdoor_api_key = _get_airflow_var("GLASSDOOR_API_KEY")
         if glassdoor_api_key:
             try:
                 glassdoor_client = GlassdoorClient(api_key=glassdoor_api_key)
@@ -725,9 +742,9 @@ def enrich_data(**context):
         else:
             print("GLASSDOOR_API_KEY not set; skipping company enrichment")
 
-        ti = context['ti']
-        normalize_result = ti.xcom_pull(task_ids='normalize', default={})
-        source_filter = normalize_result.get('source')
+        ti = context["ti"]
+        normalize_result = ti.xcom_pull(task_ids="normalize", default={})
+        source_filter = normalize_result.get("source")
         sources = [source_filter] if source_filter else None
 
         stats = run_enricher(
@@ -784,7 +801,7 @@ def rank_jobs(**context):
     from airflow.hooks.base import BaseHook
 
     # Add project root to path so we can import services
-    project_root = '/opt/airflow'
+    project_root = "/opt/airflow"
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
@@ -799,7 +816,7 @@ def rank_jobs(**context):
         from services.ranker.scoring import calculate_rank
 
         # Get database URL from Airflow connection with fallback to env
-        database_url = _get_database_url('postgres_default')
+        database_url = _get_database_url("postgres_default")
 
         print("Loading ranking configuration...")
         config = load_ranking_config()
@@ -821,11 +838,13 @@ def rank_jobs(**context):
         for i, job in enumerate(jobs, 1):
             try:
                 rank_score, rank_explain = calculate_rank(job, config)
-                rankings.append({
-                    'hash_key': job['hash_key'],
-                    'rank_score': rank_score,
-                    'rank_explain': rank_explain,
-                })
+                rankings.append(
+                    {
+                        "hash_key": job["hash_key"],
+                        "rank_score": rank_score,
+                        "rank_explain": rank_explain,
+                    }
+                )
 
                 if i % 10 == 0 or i == len(jobs):
                     print(f"  Ranked {i}/{len(jobs)} jobs...")
@@ -850,16 +869,16 @@ def rank_jobs(**context):
         print(f"  - Newly ranked:       {updated_count}")
         print(f"  - Total ranked:       {stats['ranked_jobs']}")
         print(f"  - Unranked:           {stats['unranked_jobs']}")
-        if stats['average_score']:
+        if stats["average_score"]:
             print(f"  - Average score:      {stats['average_score']:.2f}")
             print(f"  - Top score:          {stats['top_score']:.2f}")
         print("=" * 60)
 
         return {
             "ranked_count": updated_count,
-            "total_count": stats['total_jobs'],
-            "average_score": stats['average_score'],
-            "top_score": stats['top_score']
+            "total_count": stats["total_jobs"],
+            "average_score": stats["average_score"],
+            "top_score": stats["top_score"],
         }
 
     except Exception as e:
@@ -903,10 +922,10 @@ def publish_to_tableau(**context):
         from services.publisher_hyper.exporter import export_from_env
 
         # Get database URL for export
-        database_url = _get_database_url('postgres_default')
+        database_url = _get_database_url("postgres_default")
 
         # Set DATABASE_URL for export_from_env
-        os.environ['DATABASE_URL'] = database_url
+        os.environ["DATABASE_URL"] = database_url
 
         hyper_path = export_from_env(output_dir="artifacts", hyper_filename="jobs_ranked.hyper")
         print(f"Created hyper: {hyper_path}")
@@ -915,6 +934,7 @@ def publish_to_tableau(**context):
     except Exception as e:
         print("Publish failed:", e)
         import traceback
+
         traceback.print_exc()
         print("=" * 60)
         # Still return a value for downstream tasks
@@ -938,7 +958,7 @@ def send_notification_email(**context):
     from airflow.models import TaskInstance
 
     # Add project root to path so we can import services
-    project_root = '/opt/airflow'
+    project_root = "/opt/airflow"
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
@@ -948,8 +968,8 @@ def send_notification_email(**context):
 
     try:
         # Get task instance and DAG run from context
-        ti: TaskInstance = context['ti']
-        dag_run = context['dag_run']
+        ti: TaskInstance = context["ti"]
+        dag_run = context["dag_run"]
 
         # Calculate duration with timezone awareness
         start_time = dag_run.start_date
@@ -969,14 +989,14 @@ def send_notification_email(**context):
 
         for task_instance in task_instances:
             # Skip the notification task itself and the end dummy task
-            if task_instance.task_id in ['notify_daily', 'end']:
+            if task_instance.task_id in ["notify_daily", "end"]:
                 continue
 
-            if task_instance.state == 'failed':
+            if task_instance.state == "failed":
                 failed_tasks.append(task_instance.task_id)
-            elif task_instance.state == 'skipped':
+            elif task_instance.state == "skipped":
                 skipped_tasks.append(task_instance.task_id)
-            elif task_instance.state in ['running', 'queued', 'up_for_retry', 'up_for_reschedule']:
+            elif task_instance.state in ["running", "queued", "up_for_retry", "up_for_reschedule"]:
                 running_tasks.append(task_instance.task_id)
 
         # Determine overall status: success if no failed tasks
@@ -990,19 +1010,19 @@ def send_notification_email(**context):
         print(f"  - Overall status: {'SUCCESS' if is_success else 'FAILED'}")
 
         # Collect counts from XCom
-        extract_result = ti.xcom_pull(task_ids='extract_jsearch', default={})
-        normalize_result = ti.xcom_pull(task_ids='normalize', default={})
-        enrich_result = ti.xcom_pull(task_ids='enrich', default={})
-        rank_result = ti.xcom_pull(task_ids='rank', default={})
+        extract_result = ti.xcom_pull(task_ids="extract_jsearch", default={})
+        normalize_result = ti.xcom_pull(task_ids="normalize", default={})
+        enrich_result = ti.xcom_pull(task_ids="enrich", default={})
+        rank_result = ti.xcom_pull(task_ids="rank", default={})
 
-        extracted_count = extract_result.get('extracted_count', 0)
-        normalized_count = normalize_result.get('normalized_count', 0)
-        enriched_count = enrich_result.get('enriched_count', 0)
-        ranked_count = rank_result.get('ranked_count', 0)
+        extracted_count = extract_result.get("extracted_count", 0)
+        normalized_count = normalize_result.get("normalized_count", 0)
+        enriched_count = enrich_result.get("enriched_count", 0)
+        ranked_count = rank_result.get("ranked_count", 0)
 
         # Get database connection for queries
         try:
-            database_url = _get_database_url('postgres_default')
+            database_url = _get_database_url("postgres_default")
         except Exception as e:
             print(f"Warning: Could not get database connection: {e}")
             print("Warning: DATABASE_URL not configured, skipping database queries")
@@ -1014,9 +1034,7 @@ def send_notification_email(**context):
 
         execution_date = dag_run.execution_date
         execution_date_local = (
-            pendulum.instance(execution_date).in_timezone(TZ)
-            if execution_date
-            else None
+            pendulum.instance(execution_date).in_timezone(TZ) if execution_date else None
         )
 
         if database_url:
@@ -1031,7 +1049,7 @@ def send_notification_email(**context):
                             SELECT COUNT(DISTINCT hash_key) as count
                             FROM marts.fact_jobs
                         """)
-                        deduped_unique_count = cur.fetchone()['count'] or 0
+                        deduped_unique_count = cur.fetchone()["count"] or 0
 
                         # Get top 25 ranked jobs filtered to current run timeframe
                         if execution_date_local:
@@ -1084,7 +1102,9 @@ def send_notification_email(**context):
                                 (filter_time_utc,),
                             )
                         else:
-                            print("Warning: No execution_date or start_date; fetching top 25 without time filter")
+                            print(
+                                "Warning: No execution_date or start_date; fetching top 25 without time filter"
+                            )
                             cur.execute(
                                 """
                                 SELECT
@@ -1103,13 +1123,15 @@ def send_notification_email(**context):
                         top_jobs = cur.fetchall()
 
                         for job in top_jobs:
-                            top_matches.append({
-                                "title": job['title'] or 'Unknown',
-                                "company": job['company'] or 'Unknown',
-                                "location": job['location'] or 'Unknown',
-                                "score": float(job['score']) if job['score'] else 0.0,
-                                "apply_url": job['apply_url'] or ''
-                            })
+                            top_matches.append(
+                                {
+                                    "title": job["title"] or "Unknown",
+                                    "company": job["company"] or "Unknown",
+                                    "location": job["location"] or "Unknown",
+                                    "score": float(job["score"]) if job["score"] else 0.0,
+                                    "apply_url": job["apply_url"] or "",
+                                }
+                            )
 
             except Exception as e:
                 print(f"Warning: Failed to query database for top matches: {e}")
@@ -1125,11 +1147,11 @@ def send_notification_email(**context):
                 "deduped_unique": deduped_unique_count,
                 "enriched": enriched_count,
                 "ranked": ranked_count,
-                "top_matches": len(top_matches)
+                "top_matches": len(top_matches),
             },
             "new_top_matches": top_matches,
             "failures": failed_tasks,
-            "duration_sec": duration_sec
+            "duration_sec": duration_sec,
         }
 
         # Prepare email content
@@ -1142,7 +1164,9 @@ def send_notification_email(**context):
         lines = [
             f"Status: {'SUCCESS' if is_success else 'FAILED'}",
             f"Execution (ET): {execution_label}",
-            f"Start: {start_time.to_datetime_string()} {start_time.timezone_name}" if start_time else "Start: unknown",
+            f"Start: {start_time.to_datetime_string()} {start_time.timezone_name}"
+            if start_time
+            else "Start: unknown",
             f"End: {end_time.to_datetime_string()} {end_time.timezone_name}",
             f"Duration: {duration_sec}s",
             "Counts:",
@@ -1161,23 +1185,26 @@ def send_notification_email(**context):
             lines.append("")
             lines.append("Top matches:")
             for job in top_matches[:10]:
-                lines.append(f"  - {job['title']} @ {job['company']} ({job['location']}) score={job['score']:.2f}")
+                lines.append(
+                    f"  - {job['title']} @ {job['company']} ({job['location']}) score={job['score']:.2f}"
+                )
 
         text_body = "\n".join(lines)
 
         # HTML body (optional) - escape user data for security
         from html import escape
+
         html_rows = "".join(
             f"<tr><td>{escape(str(j['title'] or ''))}</td><td>{escape(str(j['company'] or ''))}</td>"
             f"<td>{escape(str(j['location'] or ''))}</td><td>{j['score']:.2f}</td>"
             f"<td><a href='{escape(str(j['apply_url'] or ''))}'>Apply</a></td></tr>"
             for j in top_matches[:25]
         )
-        failed_tasks_escaped = ', '.join(escape(t) for t in failed_tasks) if failed_tasks else ''
+        failed_tasks_escaped = ", ".join(escape(t) for t in failed_tasks) if failed_tasks else ""
         html_body = f"""
-        <h3>Job-ETL Daily: {'SUCCESS' if is_success else 'FAILED'}</h3>
+        <h3>Job-ETL Daily: {"SUCCESS" if is_success else "FAILED"}</h3>
         <p><strong>Execution (ET):</strong> {execution_label}</p>
-        <p><strong>Start:</strong> {start_time.to_datetime_string() if start_time else 'unknown'} {start_time.timezone_name if start_time else ''}</p>
+        <p><strong>Start:</strong> {start_time.to_datetime_string() if start_time else "unknown"} {start_time.timezone_name if start_time else ""}</p>
         <p><strong>End:</strong> {end_time.to_datetime_string()} {end_time.timezone_name}</p>
         <p><strong>Duration:</strong> {duration_sec}s</p>
         <ul>
@@ -1188,7 +1215,7 @@ def send_notification_email(**context):
           <li>ranked: {ranked_count}</li>
           <li>new_top_matches: {len(top_matches)}</li>
         </ul>
-        {f'<p><strong>Failed tasks:</strong> {failed_tasks_escaped}</p>' if failed_tasks else ''}
+        {f"<p><strong>Failed tasks:</strong> {failed_tasks_escaped}</p>" if failed_tasks else ""}
         <table border="1" cellpadding="4" cellspacing="0">
           <thead><tr><th>Title</th><th>Company</th><th>Location</th><th>Score</th><th>Link</th></tr></thead>
           <tbody>{html_rows}</tbody>
@@ -1201,12 +1228,14 @@ def send_notification_email(**context):
             from services.notifier.email import EmailChannel
 
             channel = EmailChannel()
-            channel.send(NotificationMessage(
-                subject=subject,
-                text=text_body,
-                html=html_body,
-                metadata=payload,
-            ))
+            channel.send(
+                NotificationMessage(
+                    subject=subject,
+                    text=text_body,
+                    html=html_body,
+                    metadata=payload,
+                )
+            )
 
             print("=" * 60)
             print("NOTIFICATION EMAIL TASK - Success")
@@ -1246,7 +1275,6 @@ with DAG(
     max_active_runs=1,  # Only one run at a time
     tags=["etl", "jobs", "daily", "production"],
 ) as dag:
-
     # -------------------------------------------------------------------------
     # Task 1: Start (Dummy marker)
     # -------------------------------------------------------------------------
@@ -1257,7 +1285,7 @@ with DAG(
 
         This is a dummy task that marks the beginning of the DAG.
         It has no functionality but helps visualize the flow in the UI.
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1273,7 +1301,7 @@ with DAG(
         - Calls source-extractor service with JSearch adapter
         - Stores raw JSON to raw.job_postings_raw
         - Returns extracted count via XCom
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1289,7 +1317,7 @@ with DAG(
         - Calls normalizer service
         - Converts provider-specific fields to standard schema
         - Ensures consistent enums and data types
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1307,7 +1335,7 @@ with DAG(
         - Uses fuzzy matching to match company names to Glassdoor API results
         - Updates staging.job_postings_stg with skills
         - Updates staging.companies_stg with enriched company data
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1324,7 +1352,7 @@ with DAG(
         - Builds dimension tables (dim_companies)
         - Builds fact tables (fact_jobs)
         - Generates surrogate keys and relationships
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1345,7 +1373,7 @@ with DAG(
         - Uses hash_key = md5(company|title|location)
         - Upserts: update last_seen_at if exists, insert if new
         - Preserves first_seen_at for historical tracking
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1363,7 +1391,7 @@ with DAG(
         - Calculates rank_score (0-100)
         - Generates rank_explain JSON with feature subscores
         - Updates marts.fact_jobs
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1380,7 +1408,7 @@ with DAG(
         - Tests not_null on critical fields
         - Tests accepted_values for enums
         - Tests referential integrity (foreign keys)
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1397,7 +1425,7 @@ with DAG(
         - Exports marts.fact_jobs and marts.dim_companies
         - Creates .hyper files in ./artifacts/
         - Optionally publishes to Tableau Server/Cloud
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1415,7 +1443,7 @@ with DAG(
         - Formats summary with top matches
         - Sends via SMTP (see SMTP_* env vars)
         - Runs even if upstream tasks fail (to report errors)
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1427,7 +1455,7 @@ with DAG(
         **End of jobs_etl_daily pipeline**
 
         This is a dummy task that marks the successful completion of the DAG.
-        """
+        """,
     )
 
     # -------------------------------------------------------------------------
@@ -1445,4 +1473,3 @@ with DAG(
     dbt_tests >> publish_hyper
     publish_hyper >> notify_daily
     notify_daily >> end
-
