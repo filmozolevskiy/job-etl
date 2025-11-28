@@ -18,9 +18,9 @@ perform any database operations.
 """
 
 from __future__ import annotations
+
 import sys
 from typing import Final
-
 
 DEPRECATION_MESSAGE: Final[str] = (
     "scripts/backfill_seniority_levels.py is deprecated.\n"
