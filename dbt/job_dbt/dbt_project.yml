@@ -44,6 +44,8 @@ models:
       +schema: staging
       
     # Config for marts (dimensions and facts)
+    # Note: Individual models override this with incremental materialization
+    # to preserve rank_score and rank_explain during incremental runs
     marts:
       +materialized: table
       +schema: marts

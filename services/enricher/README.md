@@ -1,15 +1,23 @@
 # Enricher Service
 
-The enricher service enriches job postings with extracted skills and company information.
+The enricher service enriches job postings with extracted skills, seniority information, and company information.
 
 ## Features
 
 1. **Skills Extraction**: Extracts skills from job descriptions using spaCy and curated keyword dictionaries
-2. **Company Enrichment**: Enriches company data by calling the Glassdoor API and using fuzzy matching
+2. **Seniority Enrichment**: Derives `seniority_level` from job titles using shared rules and tracks progress with a status flag
+3. **Company Enrichment**: Enriches company data by calling the Glassdoor API and using fuzzy matching
 
-## Skills Extraction
+## Skills Extraction & Seniority Enrichment
 
 The service reads job postings from `staging.job_postings_stg` that have descriptions but no skills, extracts skills using NLP techniques, and writes the results back to the same table.
+
+For seniority, the service:
+- Selects rows where `seniority_enrichment_status = 'not_tried'`
+- Uses `services.common.seniority_extractor.extract_seniority_level()` to detect level from `job_title`
+- Updates `staging.job_postings_stg.seniority_level` and sets `seniority_enrichment_status` to:
+  - `upgraded` when the detected level is more specific than the previous value
+  - `failed_to_upgrade` when no better level can be determined, to avoid repeated work
 
 ### Skills Dictionary
 
@@ -42,6 +50,15 @@ Company names are matched using the `rapidfuzz` library with an 80% similarity t
 - Normalizes company names (removes common suffixes like "Inc.", "LLC", etc.)
 - Compares normalized names using fuzzy string matching
 - Returns the best match if similarity score >= 80%
+
+### Idempotency & Skipped Companies
+
+To avoid repeatedly calling the Glassdoor API for companies that don't have good matches, the service tracks enrichment status using the `enriched_at` column in `staging.companies_stg`:
+- Companies with successful matches have `enriched_at` set when data is upserted
+- Companies without good matches (similarity < 80% or no API results) are marked as skipped by setting `enriched_at = NOW()`
+- `fetch_companies_needing_enrichment()` only returns companies where `enriched_at IS NULL`, ensuring skipped companies are not retried on subsequent runs
+
+This ensures idempotent behavior: re-running the enricher will not make redundant API calls for companies that were already processed (whether successfully enriched or skipped).
 
 ### Glassdoor API
 

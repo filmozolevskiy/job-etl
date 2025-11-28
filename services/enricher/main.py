@@ -17,6 +17,8 @@ from typing import Optional
 
 from dotenv import load_dotenv
 
+from services.common.seniority_extractor import extract_seniority_level
+
 from .company_matcher import CompanyMatcher
 from .db_operations import DatabaseError, EnricherDB
 from .glassdoor_client import GlassdoorClient
@@ -141,65 +143,110 @@ def run_enricher(
         Dictionary with counters describing the run.
     """
     stats = {
-        "fetched": 0,
-        "processed": 0,
-        "updated": 0,
-        "unchanged": 0,
+        "skills_jobs_fetched": 0,
+        "skills_jobs_processed": 0,
+        "skills_jobs_updated": 0,
+        "skills_jobs_unchanged": 0,
         "companies_fetched": 0,
         "companies_enriched": 0,
         "companies_skipped": 0,
         "companies_errors": 0,
+        "seniority_fetched": 0,
+        "seniority_upgraded": 0,
+        "seniority_failed": 0,
     }
+
+    # ============================================================
+    # STEP 1: Skills Extraction
+    # ============================================================
+    logger.info("=" * 60)
+    logger.info("STEP 1: Skills Extraction")
+    logger.info("=" * 60)
 
     jobs = db.fetch_jobs_for_skills(
         sources=sources,
         limit=limit,
         only_missing=not include_existing,
     )
-    stats["fetched"] = len(jobs)
+    stats["skills_jobs_fetched"] = len(jobs)
 
     logger.info(
-        "Fetched %s job(s) for enrichment (limit=%s, include_existing=%s)",
-        stats["fetched"],
+        "Fetched %s job(s) for skills extraction (limit=%s, include_existing=%s)",
+        stats["skills_jobs_fetched"],
         limit,
         include_existing,
     )
 
-    updates: list[tuple[str, list[str]]] = []
+    if not jobs:
+        logger.info("No jobs found requiring skills extraction")
+    else:
+        updates: list[tuple[str, list[str]]] = []
 
-    for job in jobs:
-        stats["processed"] += 1
-        hash_key = job["hash_key"]
-        description = job.get("description")
-        current_skills = job.get("skills_raw") or []
+        for job in jobs:
+            stats["skills_jobs_processed"] += 1
+            hash_key = job["hash_key"]
+            description = job.get("description")
+            current_skills = job.get("skills_raw") or []
 
-        new_skills = extractor.extract(description, current_skills)
-        current_set = {
-            skill.strip().lower()
-            for skill in current_skills
-            if isinstance(skill, str) and skill.strip()
-        }
-        new_set = set(new_skills)
+            new_skills = extractor.extract(description, current_skills)
+            current_set = {
+                skill.strip().lower()
+                for skill in current_skills
+                if isinstance(skill, str) and skill.strip()
+            }
+            new_set = set(new_skills)
 
-        if new_set != current_set:
-            logger.debug(
-                "Skill update required",
-                extra={
-                    "hash_key": hash_key,
-                    "company": job.get("company"),
-                    "job_title": job.get("job_title"),
-                    "before": sorted(current_set),
-                    "after": sorted(new_set),
-                },
+            if new_set != current_set:
+                logger.info(
+                    "Skills updated for job: %s (ID: %s); extracted %s skill(s)",
+                    job.get("job_title", "Unknown"),
+                    hash_key,
+                    len(new_set),
+                )
+                updates.append((hash_key, new_skills))
+                stats["skills_jobs_updated"] += 1
+            else:
+                stats["skills_jobs_unchanged"] += 1
+
+        if updates and not dry_run:
+            updated_rows = db.update_job_skills_batch(updates)
+            if updated_rows != len(updates):
+                logger.warning(
+                    "Requested updates for %s job(s) but only %s row(s) were affected",
+                    len(updates),
+                    updated_rows,
+                )
+            else:
+                logger.info("Persisted enriched skills for %s job(s)", updated_rows)
+
+        if not updates:
+            logger.info("No skill updates required")
+
+        if dry_run:
+            logger.info(
+                "Dry run enabled; skipping database update for %s job(s)", len(updates)
             )
-            updates.append((hash_key, new_skills))
-            stats["updated"] += 1
-        else:
-            stats["unchanged"] += 1
 
-    # Run company enrichment if enabled (before early returns)
+    # Step 1 Summary
+    logger.info("-" * 60)
+    logger.info(
+        "Skills Extraction Summary: jobs_fetched=%s, jobs_processed=%s, "
+        "jobs_updated=%s, jobs_unchanged=%s",
+        stats["skills_jobs_fetched"],
+        stats["skills_jobs_processed"],
+        stats["skills_jobs_updated"],
+        stats["skills_jobs_unchanged"],
+    )
+    logger.info("=" * 60)
+
+    # ============================================================
+    # STEP 2: Company Enrichment
+    # ============================================================
     if enrich_companies and matcher:
-        logger.info("Starting company enrichment step")
+        logger.info("=" * 60)
+        logger.info("STEP 2: Company Enrichment")
+        logger.info("=" * 60)
+
         company_stats = run_company_enrichment(
             db=db,
             matcher=matcher,
@@ -210,26 +257,149 @@ def run_enricher(
         stats["companies_skipped"] = company_stats["skipped"]
         stats["companies_errors"] = company_stats["errors"]
         stats["base_records_created"] = company_stats.get("base_records_created", 0)
+    else:
+        logger.info("=" * 60)
+        logger.info("STEP 2: Company Enrichment - SKIPPED")
+        logger.info("=" * 60)
 
-    if not updates:
-        logger.info("No skill updates required")
+    # ============================================================
+    # STEP 3: Seniority Enrichment
+    # ============================================================
+    logger.info("=" * 60)
+    logger.info("STEP 3: Seniority Enrichment")
+    logger.info("=" * 60)
+    seniority_jobs = db.fetch_jobs_for_seniority(
+        sources=sources,
+        limit=limit,
+    )
+    stats["seniority_fetched"] = len(seniority_jobs)
+
+    if not seniority_jobs:
+        logger.info("No jobs found requiring seniority enrichment")
+        logger.info("-" * 60)
+        logger.info(
+            "Seniority Enrichment Summary: fetched=0, upgraded=0, failed=0"
+        )
+        logger.info("=" * 60)
+        return stats
+
+    logger.info(
+        "Found %s job(s) in staging.job_postings_stg needing seniority enrichment",
+        stats["seniority_fetched"],
+    )
+
+    seniority_updates: list[tuple[str, Optional[str], str]] = []
+
+    for job in seniority_jobs:
+        hash_key = job["hash_key"]
+        job_title = job.get("job_title") or ""
+        current_level = job.get("seniority_level") or "unknown"
+
+        try:
+            new_level = extract_seniority_level(job_title)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error(
+                "Failed to extract seniority_level for job %s (ID: %s): %s",
+                job_title,
+                hash_key,
+                exc,
+            )
+            seniority_updates.append((hash_key, current_level, "failed_to_upgrade"))
+            stats["seniority_failed"] += 1
+            continue
+
+        if new_level != "unknown" and new_level != current_level:
+            logger.info(
+                "Seniority level upgraded for job: %s (ID: %s); %s -> %s",
+                job_title,
+                hash_key,
+                current_level,
+                new_level,
+            )
+            seniority_updates.append((hash_key, new_level, "upgraded"))
+            stats["seniority_upgraded"] += 1
+        else:
+            # We attempted enrichment but could not improve the level; avoid
+            # retrying indefinitely by marking as failed_to_upgrade.
+            logger.info(
+                "No seniority level upgrade possible for job: %s (ID: %s); "
+                "current=%s, detected=%s; marking as failed_to_upgrade",
+                job_title,
+                hash_key,
+                current_level,
+                new_level,
+            )
+            seniority_updates.append((hash_key, current_level, "failed_to_upgrade"))
+            stats["seniority_failed"] += 1
+
+    if not seniority_updates:
+        logger.info("No seniority updates required")
+        logger.info("-" * 60)
+        logger.info(
+            "Seniority Enrichment Summary: fetched=%s, upgraded=0, failed=0",
+            stats["seniority_fetched"],
+        )
+        logger.info("=" * 60)
         return stats
 
     if dry_run:
         logger.info(
-            "Dry run enabled; skipping database update for %s job(s)", len(updates)
+            "Dry run enabled; skipping seniority update for %s job(s)",
+            len(seniority_updates),
         )
+        logger.info("-" * 60)
+        logger.info(
+            "Seniority Enrichment Summary: fetched=%s, upgraded=%s, failed=%s",
+            stats["seniority_fetched"],
+            stats["seniority_upgraded"],
+            stats["seniority_failed"],
+        )
+        logger.info("=" * 60)
         return stats
 
-    updated_rows = db.update_job_skills_batch(updates)
-    if updated_rows != len(updates):
+    updated_rows = db.update_job_seniority_batch(seniority_updates)
+    if updated_rows != len(seniority_updates):
         logger.warning(
-            "Requested updates for %s job(s) but only %s row(s) were affected",
-            len(updates),
+            "Requested seniority updates for %s job(s) but only %s row(s) were affected",
+            len(seniority_updates),
             updated_rows,
         )
     else:
-        logger.info("Persisted enriched skills for %s job(s)", updated_rows)
+        logger.info("Persisted seniority enrichment for %s job(s)", updated_rows)
+
+    # Step 3 Summary
+    logger.info("-" * 60)
+    logger.info(
+        "Seniority Enrichment Summary: fetched=%s, upgraded=%s, failed=%s",
+        stats["seniority_fetched"],
+        stats["seniority_upgraded"],
+        stats["seniority_failed"],
+    )
+    logger.info("=" * 60)
+
+    # ============================================================
+    # FINAL SUMMARY
+    # ============================================================
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("ENRICHMENT RUN COMPLETE - FINAL SUMMARY")
+    logger.info("=" * 60)
+    logger.info(
+        "Skills:        jobs_fetched=%s, jobs_processed=%s, "
+        "jobs_updated=%s, jobs_unchanged=%s",
+        stats["skills_jobs_fetched"], stats["skills_jobs_processed"],
+        stats["skills_jobs_updated"], stats["skills_jobs_unchanged"]
+    )
+    logger.info(
+        "Companies:     companies_fetched=%s, companies_enriched=%s, "
+        "companies_skipped=%s, companies_errors=%s",
+        stats["companies_fetched"], stats["companies_enriched"],
+        stats["companies_skipped"], stats["companies_errors"]
+    )
+    logger.info("Seniority:     jobs_fetched=%s, seniority_upgraded=%s, seniority_failed=%s",
+                stats["seniority_fetched"], stats["seniority_upgraded"], stats["seniority_failed"])
+    logger.info("=" * 60)
+    logger.info("")
 
     return stats
 
@@ -277,6 +447,13 @@ def run_company_enrichment(
 
     if not companies_to_enrich:
         logger.info("No companies found in staging.companies_stg needing enrichment")
+        logger.info("-" * 60)
+        logger.info(
+            "Company Enrichment Summary: fetched=0, enriched=0, skipped=0, "
+            "errors=0, base_records_created=%s",
+            stats["base_records_created"],
+        )
+        logger.info("=" * 60)
         return stats
 
     logger.info(
@@ -296,13 +473,15 @@ def run_company_enrichment(
                 # Upsert enriched data
                 db.upsert_company_enrichment(company_id, matched_company)
                 stats["enriched"] += 1
-                logger.debug(
+                logger.info(
                     "Enriched company: %s (ID: %s)", company_name, company_id
                 )
             else:
+                # Mark as attempted so we don't call Glassdoor again for this company
+                db.mark_company_enrichment_skipped(company_id)
                 stats["skipped"] += 1
                 logger.info(
-                    "No good Glassdoor match found for company: %s (ID: %s)",
+                    "No good Glassdoor match found for company: %s (ID: %s); marking as skipped",
                     company_name,
                     company_id,
                 )
@@ -318,12 +497,18 @@ def run_company_enrichment(
                 exc_info=True,
             )
 
+    # Step 2 Summary (called from run_company_enrichment)
+    logger.info("-" * 60)
     logger.info(
-        "Company enrichment completed: %s enriched, %s skipped, %s errors",
+        "Company Enrichment Summary: fetched=%s, enriched=%s, skipped=%s, "
+        "errors=%s, base_records_created=%s",
+        stats["fetched"],
         stats["enriched"],
         stats["skipped"],
         stats["errors"],
+        stats["base_records_created"],
     )
+    logger.info("=" * 60)
 
     return stats
 
@@ -349,7 +534,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             glassdoor_api_key = args.glassdoor_api_key or os.getenv("GLASSDOOR_API_KEY")
             if not glassdoor_api_key:
                 logger.warning(
-                    "Company enrichment enabled but GLASSDOOR_API_KEY not set; skipping company enrichment"
+                    "Company enrichment enabled but GLASSDOOR_API_KEY not set; "
+                    "skipping company enrichment"
                 )
             else:
                 try:
@@ -363,7 +549,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     logger.warning("Continuing without company enrichment")
                     matcher = None
 
-        stats = run_enricher(
+        run_enricher(
             db=db,
             extractor=extractor,
             limit=args.limit,
@@ -374,14 +560,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             matcher=matcher,
         )
 
-        if stats["updated"] == 0 and stats.get("companies_enriched", 0) == 0:
-            logger.info("Enricher completed; no updates were necessary")
-        else:
-            logger.info(
-                "Enricher completed: %s skill updates, %s companies enriched",
-                stats["updated"],
-                stats.get("companies_enriched", 0),
-            )
+        # Detailed summary is already logged in run_enricher()
+        logger.info("Enricher service completed successfully")
         return 0
     except DatabaseError as exc:
         logger.error("Database error: %s", exc)

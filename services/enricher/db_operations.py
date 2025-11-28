@@ -175,6 +175,112 @@ class EnricherDB:
         except psycopg2.Error as exc:
             raise DatabaseError(f"Failed to update enriched skills: {exc}") from exc
 
+    def fetch_jobs_for_seniority(
+        self,
+        *,
+        sources: Optional[Sequence[str]] = None,
+        limit: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve job postings that require seniority enrichment.
+
+        Jobs are selected primarily based on the ``seniority_enrichment_status``
+        flag to avoid repeatedly processing the same rows. Only rows where
+        status is ``'not_tried'`` are returned.
+
+        Args:
+            sources: Optional list of provider sources to filter by.
+            limit: Maximum number of rows to fetch.
+
+        Returns:
+            List of dict rows containing ``hash_key``, ``job_title``, current
+            ``seniority_level`` and ``seniority_enrichment_status`` along with
+            metadata helpful for logging.
+        """
+        conditions = [sql.SQL("seniority_enrichment_status = %s")]
+        params: list[Any] = ["not_tried"]
+
+        if sources:
+            conditions.append(sql.SQL("source = ANY(%s)"))
+            params.append(sources)
+
+        where_clause = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions)
+
+        query_parts = [
+            sql.SQL(
+                """
+                SELECT
+                    hash_key,
+                    job_title,
+                    company,
+                    source,
+                    seniority_level,
+                    seniority_enrichment_status
+                FROM staging.job_postings_stg
+                """
+            ),
+            where_clause,
+            sql.SQL(" ORDER BY last_seen_at DESC"),
+        ]
+
+        if limit:
+            query_parts.append(sql.SQL(" LIMIT %s"))
+            params.append(limit)
+
+        query = sql.SQL("").join(query_parts)
+
+        try:
+            with self._get_connection() as conn, conn.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) as cursor:
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+        except psycopg2.Error as exc:
+            raise DatabaseError(
+                f"Failed to fetch jobs for seniority enrichment: {exc}"
+            ) from exc
+
+    def update_job_seniority_batch(
+        self, updates: Iterable[tuple[str, Optional[str], str]]
+    ) -> int:
+        """
+        Persist seniority enrichment results for multiple jobs.
+
+        Args:
+            updates: Iterable of ``(hash_key, seniority_level, status)``
+                tuples, where ``status`` is one of
+                ``'not_tried'``, ``'upgraded'`` or ``'failed_to_upgrade'``.
+
+        Returns:
+            Number of rows updated.
+        """
+        updates = list(updates)
+        if not updates:
+            return 0
+
+        query = """
+            UPDATE staging.job_postings_stg
+            SET
+                seniority_level = %s,
+                seniority_enrichment_status = %s
+            WHERE hash_key = %s
+        """
+
+        params = [
+            (seniority_level, status, hash_key)
+            for hash_key, seniority_level, status in updates
+        ]
+
+        try:
+            with self._get_connection() as conn, conn.cursor() as cursor:
+                cursor.executemany(query, params)
+                return cursor.rowcount
+        except psycopg2.Error as exc:
+            raise DatabaseError(
+                f"Failed to update seniority enrichment: {exc}"
+            ) from exc
+
     def upsert_base_company_records(self) -> int:
         """
         Create base company records in companies_stg from job_postings_stg.
@@ -449,5 +555,34 @@ class EnricherDB:
         except psycopg2.Error as exc:
             raise DatabaseError(
                 f"Failed to upsert company enrichment: {exc}"
+            ) from exc
+
+    def mark_company_enrichment_skipped(self, company_id: str) -> int:
+        """
+        Mark a company as attempted for enrichment without a Glassdoor match.
+
+        This sets ``enriched_at`` so that ``fetch_companies_needing_enrichment``
+        will stop re-queuing the same company on every run.
+
+        Args:
+            company_id: ID of the company in ``staging.companies_stg``.
+
+        Returns:
+            Number of rows updated (0 or 1).
+        """
+        query = """
+            UPDATE staging.companies_stg
+            SET
+                enriched_at = COALESCE(enriched_at, NOW()),
+                updated_at = NOW()
+            WHERE company_id = %s
+        """
+        try:
+            with self._get_connection() as conn, conn.cursor() as cursor:
+                cursor.execute(query, (company_id,))
+                return cursor.rowcount
+        except psycopg2.Error as exc:
+            raise DatabaseError(
+                f"Failed to mark company enrichment skipped: {exc}"
             ) from exc
 

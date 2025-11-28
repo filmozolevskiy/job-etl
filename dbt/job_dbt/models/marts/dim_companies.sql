@@ -1,7 +1,8 @@
 {{
     config(
-        materialized='table',
-        schema='marts'
+        materialized='incremental',
+        schema='marts',
+        unique_key='company_id'
     )
 }}
 
@@ -34,5 +35,12 @@ SELECT
     source_first_seen,
     created_at
 FROM {{ source('staging', 'companies_stg') }}
+{% if is_incremental() %}
+WHERE created_at > (
+    SELECT
+        COALESCE(MAX(created_at), '1900-01-01'::timestamptz)
+    FROM {{ this }}
+)
+{% endif %}
 ORDER BY created_at DESC
 

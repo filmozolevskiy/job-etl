@@ -620,24 +620,85 @@ def normalize_data(**context):
         extract_result = ti.xcom_pull(task_ids="extract_jsearch")
         source_filter = extract_result.get("source") if extract_result else "jsearch"
 
-        # Filter by execution date to only process jobs from current run
-        # This ensures incremental processing instead of reprocessing all historical jobs
+        # Filter by extract task start time to only process jobs from this specific run
+        # This ensures we only process jobs collected during the extract task execution, not the entire day
+        from airflow.models import TaskInstance
+        from airflow.utils.session import provide_session
+
         dag_run = context.get("dag_run")
         min_collected_at = None
-        if dag_run and dag_run.execution_date:
-            # Get execution date in Toronto timezone
-            execution_date_local = pendulum.instance(dag_run.execution_date).in_timezone(TZ)
-            # Start from beginning of execution date (subtract 1 hour for safety margin)
-            filter_time_local = execution_date_local.start_of("day").subtract(hours=1)
-            filter_time_utc = filter_time_local.in_timezone("UTC")
-            min_collected_at = filter_time_utc.isoformat()
-            print(
-                f"Filtering to jobs collected on/after: "
-                f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
-                f"({filter_time_utc.to_datetime_string()} UTC)"
+
+        # Try to get the extract task's start time (most precise)
+        @provide_session
+        def get_extract_task_start(session=None):
+            """Get extract task start time from database."""
+            if not dag_run:
+                return None
+            extract_ti = (
+                session.query(TaskInstance)
+                .filter(
+                    TaskInstance.dag_id == dag_run.dag_id,
+                    TaskInstance.run_id == dag_run.run_id,
+                    TaskInstance.task_id == "extract_jsearch",
+                )
+                .first()
             )
-        else:
-            print("Warning: No execution_date available; processing all raw jobs (not incremental)")
+            return extract_ti.start_date if extract_ti and extract_ti.start_date else None
+
+        try:
+            extract_start_date = get_extract_task_start()
+            if extract_start_date:
+                # Use extract task start time - this is when jobs were actually collected
+                extract_start_utc = pendulum.instance(extract_start_date).in_timezone("UTC")
+                # Subtract 2 minutes for safety margin (in case jobs were saved slightly before task start)
+                filter_time_utc = extract_start_utc.subtract(minutes=2)
+                min_collected_at = filter_time_utc.isoformat()
+                extract_start_local = extract_start_utc.in_timezone(TZ)
+                filter_time_local = filter_time_utc.in_timezone(TZ)
+                print(
+                    f"Filtering to jobs collected on/after extract task start: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+                print(
+                    f"  (Extract task started at: {extract_start_local.to_datetime_string()} {extract_start_local.timezone_name})"
+                )
+            else:
+                raise ValueError("Extract task start date not available")
+        except Exception as e:
+            print(f"Warning: Could not get extract task start time: {e}")
+            # Fallback to DAG run start time
+            if dag_run and dag_run.start_date:
+                run_start_utc = pendulum.instance(dag_run.start_date).in_timezone("UTC")
+                # Subtract 5 minutes for safety margin
+                filter_time_utc = run_start_utc.subtract(minutes=5)
+                min_collected_at = filter_time_utc.isoformat()
+                run_start_local = run_start_utc.in_timezone(TZ)
+                filter_time_local = filter_time_utc.in_timezone(TZ)
+                print(
+                    f"Using DAG run start time. Filtering to jobs collected on/after: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+                print(
+                    f"  (DAG run started at: {run_start_local.to_datetime_string()} {run_start_local.timezone_name})"
+                )
+            elif dag_run and dag_run.execution_date:
+                # Final fallback to execution_date
+                execution_date_local = pendulum.instance(dag_run.execution_date).in_timezone(TZ)
+                filter_time_local = execution_date_local.start_of("day").subtract(hours=1)
+                filter_time_utc = filter_time_local.in_timezone("UTC")
+                min_collected_at = filter_time_utc.isoformat()
+                print(
+                    f"Warning: Using execution_date fallback. Filtering to jobs collected on/after: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+            else:
+                print(
+                    "Warning: No task start_date, DAG start_date, or execution_date available; "
+                    "processing all raw jobs (not incremental)"
+                )
 
         print(f"Normalizing jobs from source: {source_filter}")
 
@@ -758,20 +819,23 @@ def enrich_data(**context):
         )
 
         print("Enrichment results:")
-        print(f"  - fetched:   {stats['fetched']}")
-        print(f"  - processed: {stats['processed']}")
-        print(f"  - updated:   {stats['updated']}")
-        print(f"  - unchanged: {stats['unchanged']}")
+        print(f"  - skills_jobs_fetched:   {stats['skills_jobs_fetched']}")
+        print(f"  - skills_jobs_processed: {stats['skills_jobs_processed']}")
+        print(f"  - skills_jobs_updated:   {stats['skills_jobs_updated']}")
+        print(f"  - skills_jobs_unchanged: {stats['skills_jobs_unchanged']}")
         if matcher:
             print(f"  - companies_fetched:   {stats.get('companies_fetched', 0)}")
             print(f"  - companies_enriched:  {stats.get('companies_enriched', 0)}")
             print(f"  - companies_skipped:   {stats.get('companies_skipped', 0)}")
             print(f"  - companies_errors:    {stats.get('companies_errors', 0)}")
+        print(f"  - seniority_fetched:    {stats.get('seniority_fetched', 0)}")
+        print(f"  - seniority_upgraded:  {stats.get('seniority_upgraded', 0)}")
+        print(f"  - seniority_failed:    {stats.get('seniority_failed', 0)}")
         print("=" * 60)
 
         return {
-            "enriched_count": stats["updated"],
-            "enriched_processed": stats["processed"],
+            "enriched_count": stats["skills_jobs_updated"],
+            "enriched_processed": stats["skills_jobs_processed"],
             "companies_enriched": stats.get("companies_enriched", 0),
         }
 
@@ -824,8 +888,86 @@ def rank_jobs(**context):
         print("Connecting to database...")
         db = RankerDB(database_url)
 
+        # Filter by extract task start time to only rank jobs from this specific run
+        # This ensures we only rank new jobs ingested in this run, not all historical unranked jobs
+        from airflow.models import TaskInstance
+        from airflow.utils.session import provide_session
+
+        dag_run = context.get("dag_run")
+        min_ingested_at = None
+
+        # Try to get the extract task's start time (most precise)
+        @provide_session
+        def get_extract_task_start(session=None):
+            """Get extract task start time from database."""
+            if not dag_run:
+                return None
+            extract_ti = (
+                session.query(TaskInstance)
+                .filter(
+                    TaskInstance.dag_id == dag_run.dag_id,
+                    TaskInstance.run_id == dag_run.run_id,
+                    TaskInstance.task_id == "extract_jsearch",
+                )
+                .first()
+            )
+            return extract_ti.start_date if extract_ti and extract_ti.start_date else None
+
+        try:
+            extract_start_date = get_extract_task_start()
+            if extract_start_date:
+                # Use extract task start time - this is when jobs were actually collected
+                extract_start_utc = pendulum.instance(extract_start_date).in_timezone("UTC")
+                # Subtract 2 minutes for safety margin
+                filter_time_utc = extract_start_utc.subtract(minutes=2)
+                min_ingested_at = filter_time_utc.isoformat()
+                extract_start_local = extract_start_utc.in_timezone(TZ)
+                filter_time_local = filter_time_utc.in_timezone(TZ)
+                print(
+                    f"Filtering to jobs ingested on/after extract task start: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+                print(
+                    f"  (Extract task started at: {extract_start_local.to_datetime_string()} {extract_start_local.timezone_name})"
+                )
+            else:
+                raise ValueError("Extract task start date not available")
+        except Exception as e:
+            print(f"Warning: Could not get extract task start time: {e}")
+            # Fallback to DAG run start time
+            if dag_run and dag_run.start_date:
+                run_start_utc = pendulum.instance(dag_run.start_date).in_timezone("UTC")
+                filter_time_utc = run_start_utc.subtract(minutes=5)
+                min_ingested_at = filter_time_utc.isoformat()
+                filter_time_local = filter_time_utc.in_timezone(TZ)
+                print(
+                    f"Using DAG run start time. Filtering to jobs ingested on/after: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+                print(
+                    f"  (DAG run started at: {run_start_utc.in_timezone(TZ).to_datetime_string()} {run_start_utc.in_timezone(TZ).timezone_name})"
+                )
+            elif dag_run and dag_run.execution_date:
+                # Final fallback to execution_date
+                execution_date_local = pendulum.instance(dag_run.execution_date).in_timezone(TZ)
+                filter_time_local = execution_date_local.start_of("day").subtract(hours=1)
+                filter_time_utc = filter_time_local.in_timezone("UTC")
+                min_ingested_at = filter_time_utc.isoformat()
+                print(
+                    f"Warning: Using execution_date fallback. Filtering to jobs ingested on/after: "
+                    f"{filter_time_local.to_datetime_string()} {filter_time_local.timezone_name} "
+                    f"({filter_time_utc.to_datetime_string()} UTC)"
+                )
+            else:
+                print(
+                    "Warning: No task start_date, DAG start_date, or execution_date available; "
+                    "processing all unranked jobs (not incremental)"
+                )
+
         print("Fetching unranked jobs...")
-        jobs = db.fetch_unranked_jobs(limit=None)
+        jobs = db.fetch_unranked_jobs(limit=None, min_ingested_at=min_ingested_at)
 
         if not jobs:
             print("No unranked jobs found")

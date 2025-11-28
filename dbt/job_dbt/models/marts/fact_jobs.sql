@@ -1,7 +1,8 @@
 {{
     config(
-        materialized='table',
-        schema='marts'
+        materialized='incremental',
+        schema='marts',
+        unique_key='hash_key'
     )
 }}
 
@@ -41,6 +42,15 @@ WITH staging AS (
         -- Handle NULL companies by using 'unknown' as default
         MD5(LOWER(REGEXP_REPLACE(TRIM(COALESCE(company, 'unknown')), '\s+', ' ', 'g'))) AS company_id_normalized
     FROM {{ source('staging', 'job_postings_stg') }}
+
+    {% if is_incremental() %}
+    WHERE first_seen_at > (
+        SELECT
+            COALESCE(MAX(ingested_at), '1900-01-01'::timestamptz)
+        FROM {{ this }}
+    )
+    {% endif %}
+    
 ),
 
 companies AS (
@@ -80,10 +90,19 @@ SELECT
     staging.apply_url,
     
     -- Ranking fields (populated by ranker service)
+    -- Preserve existing rank_score and rank_explain during incremental runs
+    {% if is_incremental() %}
+    existing.rank_score,
+    existing.rank_explain
+    {% else %}
     NULL::NUMERIC AS rank_score,  -- Will be computed by ranker
     NULL::JSONB AS rank_explain  -- Will be computed by ranker
+    {% endif %}
     
 FROM staging
 LEFT JOIN companies ON staging.company_id_normalized = companies.company_id
+{% if is_incremental() %}
+LEFT JOIN {{ this }} AS existing ON staging.hash_key = existing.hash_key
+{% endif %}
 ORDER BY staging.first_seen_at DESC
 

@@ -45,6 +45,9 @@ CREATE TABLE IF NOT EXISTS staging.job_postings_stg (
     remote_type TEXT CHECK (remote_type IN ('remote', 'hybrid', 'onsite', 'unknown')),
     contract_type TEXT CHECK (contract_type IN ('full_time', 'part_time', 'contract', 'intern', 'temp', 'unknown')),
     seniority_level TEXT CHECK (seniority_level IN ('junior', 'intermediate', 'senior', 'unknown')) DEFAULT 'unknown',
+    seniority_enrichment_status TEXT CHECK (
+        seniority_enrichment_status IN ('not_tried', 'upgraded', 'failed_to_upgrade')
+    ) NOT NULL DEFAULT 'not_tried',
     salary_min NUMERIC,
     salary_max NUMERIC,
     salary_currency TEXT,

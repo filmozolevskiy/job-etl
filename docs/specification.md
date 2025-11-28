@@ -128,28 +128,29 @@
 
 **`staging.job_postings_stg`**
 
-| column          | type        | notes                                                              |       |            |
-| --------------- | ----------- | ------------------------------------------------------------------ | ----- | ---------- |
-| provider_job_id | text        | if available                                                       |       |            |
-| job_link        | text        | canonical URL                                                      |       |            |
-| job_title       | text        | raw title                                                          |       |            |
-| company         | text        | raw company name                                                   |       |            |
-| company_size    | text        | enum from provider or mapped                                       |       |            |
-| location        | text        | raw city/region/country                                            |       |            |
-| remote_type     | text        | enum: `remote`, `hybrid`, `onsite`, `unknown`                      |       |            |
-| contract_type   | text        | enum: `full_time`,`part_time`,`contract`,`intern`,`temp`,`unknown` |       |            |
-| seniority_level | text        | enum: `junior`, `intermediate`, `senior`, `unknown` (extracted from title) |       |            |
-| salary_min      | numeric     | nullable                                                           |       |            |
-| salary_max      | numeric     | nullable                                                           |       |            |
-| salary_currency | text        | ISO 4217                                                           |       |            |
-| description     | text        | full text                                                          |       |            |
-| skills_raw      | text[]      | parsed if provided                                                 |       |            |
-| posted_at       | timestamptz | provider date                                                      |       |            |
-| apply_url       | text        | canonical apply link                                               |       |            |
-| source          | text        | provider                                                           |       |            |
-| hash_key        | text pk     | `md5(company                                                       | title | location)` |
-| first_seen_at   | timestamptz | min(collected_at)                                                  |       |            |
-| last_seen_at    | timestamptz | max(collected_at)                                                  |       |            |
+| column                     | type        | notes                                                              |       |            |
+| -------------------------- | ----------- | ------------------------------------------------------------------ | ----- | ---------- |
+| provider_job_id            | text        | if available                                                       |       |            |
+| job_link                   | text        | canonical URL                                                      |       |            |
+| job_title                  | text        | raw title                                                          |       |            |
+| company                    | text        | raw company name                                                   |       |            |
+| company_size               | text        | enum from provider or mapped                                       |       |            |
+| location                   | text        | raw city/region/country                                            |       |            |
+| remote_type                | text        | enum: `remote`, `hybrid`, `onsite`, `unknown`                      |       |            |
+| contract_type              | text        | enum: `full_time`,`part_time`,`contract`,`intern`,`temp`,`unknown` |       |            |
+| seniority_level            | text        | enum: `junior`, `intermediate`, `senior`, `unknown` (filled by enricher) |       |            |
+| seniority_enrichment_status| text        | enum: `not_tried`, `upgraded`, `failed_to_upgrade` (enricher status flag) |       |            |
+| salary_min                 | numeric     | nullable                                                           |       |            |
+| salary_max                 | numeric     | nullable                                                           |       |            |
+| salary_currency            | text        | ISO 4217                                                           |       |            |
+| description                | text        | full text                                                          |       |            |
+| skills_raw                 | text[]      | parsed if provided                                                 |       |            |
+| posted_at                  | timestamptz | provider date                                                      |       |            |
+| apply_url                  | text        | canonical apply link                                               |       |            |
+| source                     | text        | provider                                                           |       |            |
+| hash_key                   | text pk     | `md5(company                                                       | title | location)` |
+| first_seen_at              | timestamptz | min(collected_at)                                                  |       |            |
+| last_seen_at               | timestamptz | max(collected_at)                                                  |       |            |
 
 **`marts.dim_companies`**
 

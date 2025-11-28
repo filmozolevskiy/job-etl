@@ -145,6 +145,7 @@ services:
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
       - ./services:/opt/airflow/services:ro
+      - ./tests:/opt/airflow/tests:ro
     ports:
       - "8080:8080"
     command:
@@ -231,6 +232,7 @@ services:
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
       - ./services:/opt/airflow/services:ro
+      - ./tests:/opt/airflow/tests:ro
     command:
       - bash
       - -c
@@ -297,6 +299,7 @@ services:
       - ./secrets:/opt/airflow/secrets:ro
       - ./artifacts:/opt/airflow/artifacts
       - ./services:/opt/airflow/services:ro
+      - ./tests:/opt/airflow/tests:ro
     command:
       - bash
       - -c

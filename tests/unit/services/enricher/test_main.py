@@ -16,6 +16,7 @@ class StubEnricherDB:
     def __init__(self, rows: list[dict[str, Any]]):
         self.rows = rows
         self.persisted_updates: list[tuple[str, Sequence[str]]] = []
+        self.seniority_updates: list[tuple[str, str | None, str]] = []
 
     def fetch_jobs_for_skills(
         self, *, only_missing: bool = True, **_: Any
@@ -31,6 +32,37 @@ class StubEnricherDB:
     ) -> int:
         self.persisted_updates.extend(updates)
         return len(updates)
+
+    def fetch_jobs_for_seniority(
+        self, *, sources: Sequence[str] | None = None, limit: int | None = None, **_: Any
+    ) -> list[dict[str, Any]]:
+        """Return jobs with seniority_enrichment_status = 'not_tried'."""
+        # Filter rows that need seniority enrichment
+        # Treat missing status as 'not_tried' for test compatibility
+        seniority_jobs = [
+            row for row in self.rows
+            if row.get("seniority_enrichment_status", "not_tried") == "not_tried"
+        ]
+        if limit:
+            return seniority_jobs[:limit]
+        return seniority_jobs
+
+    def update_job_seniority_batch(
+        self, updates: Sequence[tuple[str, str | None, str]]
+    ) -> int:
+        """Update seniority levels and status."""
+        self.seniority_updates.extend(updates)
+        return len(updates)
+
+    def fetch_companies_needing_enrichment(
+        self, limit: int | None = None, **_: Any
+    ) -> list[dict[str, Any]]:
+        """Return empty list for company enrichment (not tested in these unit tests)."""
+        return []
+
+    def mark_company_enrichment_skipped(self, company_id: str, **_: Any) -> int:
+        """Mark company as attempted (stub implementation)."""
+        return 0
 
 
 def _extractor() -> SkillsExtractor:
@@ -67,10 +99,10 @@ def test_run_enricher_updates_changed_rows() -> None:
     # Include existing rows so we can test updating hash1 from ["Python"] to ["python", "sql"]
     stats = run_enricher(db=db, extractor=_extractor(), include_existing=True)
 
-    assert stats["fetched"] == 2
-    assert stats["processed"] == 2
-    assert stats["updated"] == 1
-    assert stats["unchanged"] == 1
+    assert stats["skills_jobs_fetched"] == 2
+    assert stats["skills_jobs_processed"] == 2
+    assert stats["skills_jobs_updated"] == 1
+    assert stats["skills_jobs_unchanged"] == 1
     assert db.persisted_updates == [("hash1", ["python", "sql"])]
 
 
@@ -89,7 +121,7 @@ def test_run_enricher_respects_dry_run() -> None:
 
     stats = run_enricher(db=db, extractor=_extractor(), dry_run=True)
 
-    assert stats["updated"] == 1
+    assert stats["skills_jobs_updated"] == 1
     assert db.persisted_updates == []
 
 
@@ -113,8 +145,8 @@ def test_run_enricher_include_existing_flag() -> None:
         extractor=_extractor(),
         include_existing=False,
     )
-    assert stats_no_existing["fetched"] == 0
-    assert stats_no_existing["updated"] == 0
+    assert stats_no_existing["skills_jobs_fetched"] == 0
+    assert stats_no_existing["skills_jobs_updated"] == 0
 
     # When include_existing=True the row is processed.
     db_with_existing = StubEnricherDB(rows=db.rows)
@@ -123,6 +155,6 @@ def test_run_enricher_include_existing_flag() -> None:
         extractor=_extractor(),
         include_existing=True,
     )
-    assert stats_with_existing["fetched"] == 1
-    assert stats_with_existing["processed"] == 1
+    assert stats_with_existing["skills_jobs_fetched"] == 1
+    assert stats_with_existing["skills_jobs_processed"] == 1
 

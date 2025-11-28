@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class DatabaseError(Exception):
     """Raised when a database operation fails."""
+
     pass
 
 
@@ -81,7 +82,7 @@ class RankerDB:
                 conn.rollback()
             logger.error(
                 "Database operation failed, rolled back transaction",
-                extra={'error': str(e), 'error_type': type(e).__name__}
+                extra={"error": str(e), "error_type": type(e).__name__},
             )
             raise
         finally:
@@ -91,7 +92,8 @@ class RankerDB:
     def fetch_unranked_jobs(
         self,
         limit: Optional[int] = None,
-        where_rank_score_is_null: bool = True
+        where_rank_score_is_null: bool = True,
+        min_ingested_at: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         """
         Fetch unranked jobs from marts.fact_jobs.
@@ -99,6 +101,8 @@ class RankerDB:
         Args:
             limit: Maximum number of jobs to fetch. If None, fetch all.
             where_rank_score_is_null: If True, only fetch jobs with NULL rank_score.
+            min_ingested_at: Only fetch jobs ingested on/after this timestamp (ISO format).
+                           If None, fetch all jobs (subject to other filters).
 
         Returns:
             List of dictionaries containing job data
@@ -113,39 +117,57 @@ class RankerDB:
             100
         """
         try:
-            with self._get_connection() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            with (
+                self._get_connection() as conn,
+                conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur,
+            ):
                 # Build query with LEFT JOIN to dim_companies for company_size
-                query_conditions = ["WHERE 1=1"]
+                query_conditions = [sql.SQL("WHERE 1=1")]
+                params = []
                 if where_rank_score_is_null:
-                    query_conditions.append("AND rank_score IS NULL")
+                    query_conditions.append(sql.SQL("AND rank_score IS NULL"))
+                if min_ingested_at:
+                    query_conditions.append(sql.SQL("AND f.ingested_at >= %s"))
+                    params.append(min_ingested_at)
 
-                query_parts = [
-                    sql.SQL("SELECT"),
-                    sql.SQL("f.hash_key, f.job_title_std, f.company_id, f.location_std, f.remote_type,"),
-                    sql.SQL("f.contract_type, f.salary_min_norm, f.salary_max_norm, f.salary_currency_norm,"),
-                    sql.SQL("f.skills, f.posted_at, f.source, f.apply_url, d.company_size"),
-                    sql.SQL("FROM marts.fact_jobs f"),
-                    sql.SQL("LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id"),
-                ] + [sql.SQL(cond) for cond in query_conditions] + [
-                    sql.SQL("ORDER BY f.ingested_at DESC"),
-                ]
+                query_parts = (
+                    [
+                        sql.SQL("SELECT"),
+                        sql.SQL(
+                            "f.hash_key, f.job_title_std, f.company_id, "
+                            "f.location_std, f.remote_type,"
+                        ),
+                        sql.SQL(
+                            "f.contract_type, f.salary_min_norm, f.salary_max_norm, "
+                            "f.salary_currency_norm,"
+                        ),
+                        sql.SQL("f.skills, f.posted_at, f.source, f.apply_url, d.company_size"),
+                        sql.SQL("FROM marts.fact_jobs f"),
+                        sql.SQL("LEFT JOIN marts.dim_companies d ON f.company_id = d.company_id"),
+                    ]
+                    + query_conditions
+                    + [
+                        sql.SQL("ORDER BY f.ingested_at DESC"),
+                    ]
+                )
 
                 if limit:
                     query_parts.append(sql.SQL("LIMIT %s"))
+                    params.append(limit)
 
                 query = sql.SQL(" ").join(query_parts)
 
                 # Execute with parameters
-                params = [limit] if limit else []
                 cur.execute(query, params)
                 results = cur.fetchall()
 
                 logger.info(
                     "Fetched unranked jobs",
                     extra={
-                        'count': len(results),
-                        'limit': limit,
-                    }
+                        "count": len(results),
+                        "limit": limit,
+                        "min_ingested_at": min_ingested_at,
+                    },
                 )
 
                 # Convert to list of dicts
@@ -154,16 +176,12 @@ class RankerDB:
 
         except psycopg2.Error as e:
             logger.error(
-                "Failed to fetch unranked jobs",
-                extra={'error': str(e), 'pgcode': e.pgcode}
+                "Failed to fetch unranked jobs", extra={"error": str(e), "pgcode": e.pgcode}
             )
             raise DatabaseError(f"Failed to fetch unranked jobs: {e}") from e
 
     def update_job_ranking(
-        self,
-        hash_key: str,
-        rank_score: float,
-        rank_explain: dict[str, float]
+        self, hash_key: str, rank_score: float, rank_explain: dict[str, float]
     ) -> None:
         """
         Update a job's rank_score and rank_explain.
@@ -194,33 +212,29 @@ class RankerDB:
 
                 if cur.rowcount == 0:
                     logger.warning(
-                        "No rows updated - hash_key not found",
-                        extra={'hash_key': hash_key}
+                        "No rows updated - hash_key not found", extra={"hash_key": hash_key}
                     )
                 else:
                     logger.debug(
                         "Updated job ranking",
                         extra={
-                            'hash_key': hash_key,
-                            'rank_score': rank_score,
-                        }
+                            "hash_key": hash_key,
+                            "rank_score": rank_score,
+                        },
                     )
 
         except psycopg2.Error as e:
             logger.error(
                 "Failed to update job ranking",
                 extra={
-                    'error': str(e),
-                    'pgcode': e.pgcode,
-                    'hash_key': hash_key,
-                }
+                    "error": str(e),
+                    "pgcode": e.pgcode,
+                    "hash_key": hash_key,
+                },
             )
             raise DatabaseError(f"Failed to update job ranking: {e}") from e
 
-    def update_jobs_ranking_batch(
-        self,
-        rankings: list[dict[str, Any]]
-    ) -> int:
+    def update_jobs_ranking_batch(self, rankings: list[dict[str, Any]]) -> int:
         """
         Update multiple jobs' rankings in a single transaction.
 
@@ -251,9 +265,9 @@ class RankerDB:
             with self._get_connection() as conn, conn.cursor() as cur:
                 for ranking in rankings:
                     try:
-                        hash_key = ranking['hash_key']
-                        rank_score = ranking['rank_score']
-                        rank_explain = ranking['rank_explain']
+                        hash_key = ranking["hash_key"]
+                        rank_score = ranking["rank_score"]
+                        rank_explain = ranking["rank_explain"]
 
                         # Convert rank_explain to JSONB
                         rank_explain_json = json.dumps(rank_explain)
@@ -270,8 +284,7 @@ class RankerDB:
                         else:
                             failed_count += 1
                             logger.warning(
-                                "No rows updated for hash_key",
-                                extra={'hash_key': hash_key}
+                                "No rows updated for hash_key", extra={"hash_key": hash_key}
                             )
 
                     except Exception as e:
@@ -279,27 +292,26 @@ class RankerDB:
                         logger.warning(
                             "Failed to update individual job in batch",
                             extra={
-                                'error': str(e),
-                                'hash_key': ranking.get('hash_key'),
-                            }
+                                "error": str(e),
+                                "hash_key": ranking.get("hash_key"),
+                            },
                         )
                         # Continue processing other jobs
 
                 logger.info(
                     "Batch update completed",
                     extra={
-                        'total': len(rankings),
-                        'success': success_count,
-                        'failed': failed_count,
-                    }
+                        "total": len(rankings),
+                        "success": success_count,
+                        "failed": failed_count,
+                    },
                 )
 
                 return success_count
 
         except psycopg2.Error as e:
             logger.error(
-                "Batch update transaction failed",
-                extra={'error': str(e), 'pgcode': e.pgcode}
+                "Batch update transaction failed", extra={"error": str(e), "pgcode": e.pgcode}
             )
             raise DatabaseError(f"Batch update failed: {e}") from e
 
@@ -323,7 +335,10 @@ class RankerDB:
             >>> print(f"Ranked: {stats['ranked_jobs']}/{stats['total_jobs']}")
         """
         try:
-            with self._get_connection() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            with (
+                self._get_connection() as conn,
+                conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur,
+            ):
                 cur.execute("""
                     SELECT
                         COUNT(*) as total_jobs,
@@ -337,18 +352,18 @@ class RankerDB:
                 results = dict(cur.fetchone())
 
                 return {
-                    'total_jobs': results['total_jobs'],
-                    'ranked_jobs': results['ranked_jobs'],
-                    'unranked_jobs': results['unranked_jobs'],
-                    'average_score': float(results['average_score']) if results['average_score'] else None,
-                    'top_score': float(results['top_score']) if results['top_score'] else None,
-                    'bottom_score': float(results['bottom_score']) if results['bottom_score'] else None,
+                    "total_jobs": results["total_jobs"],
+                    "ranked_jobs": results["ranked_jobs"],
+                    "unranked_jobs": results["unranked_jobs"],
+                    "average_score": float(results["average_score"])
+                    if results["average_score"]
+                    else None,
+                    "top_score": float(results["top_score"]) if results["top_score"] else None,
+                    "bottom_score": float(results["bottom_score"])
+                    if results["bottom_score"]
+                    else None,
                 }
 
         except psycopg2.Error as e:
-            logger.error(
-                "Failed to get ranking stats",
-                extra={'error': str(e)}
-            )
+            logger.error("Failed to get ranking stats", extra={"error": str(e)})
             raise DatabaseError(f"Failed to get stats: {e}") from e
-

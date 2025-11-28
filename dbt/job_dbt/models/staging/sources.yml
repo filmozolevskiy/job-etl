@@ -13,6 +13,11 @@ sources:
             tests:
               - unique
               - not_null
+          - name: seniority_enrichment_status
+            description: "Status flag for seniority enrichment (not_tried, upgraded, failed_to_upgrade)"
+            tests:
+              - accepted_values:
+                  values: ['not_tried', 'upgraded', 'failed_to_upgrade']
           - name: job_title
             description: "Job title"
             tests:

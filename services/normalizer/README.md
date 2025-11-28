@@ -145,25 +145,27 @@ collected_at | timestamptz
 ### Output: `staging.job_postings_stg`
 
 ```sql
-hash_key         | text (PRIMARY KEY)
-provider_job_id  | text
-job_link         | text
-job_title        | text (REQUIRED)
-company          | text (REQUIRED)
-company_size     | text (enum, default: 'unknown')
-location         | text (REQUIRED)
-remote_type      | text (enum: remote/hybrid/onsite/unknown)
-contract_type    | text (enum: full_time/part_time/contract/intern/temp/unknown)
-salary_min       | numeric
-salary_max       | numeric
-salary_currency  | text
-description      | text
-skills_raw       | text[]
-posted_at        | timestamptz
-apply_url        | text
-source           | text (REQUIRED)
-first_seen_at    | timestamptz (auto)
-last_seen_at     | timestamptz (auto)
+hash_key                     | text (PRIMARY KEY)
+provider_job_id              | text
+job_link                     | text
+job_title                    | text (REQUIRED)
+company                      | text (REQUIRED)
+company_size                 | text (enum, default: 'unknown')
+location                     | text (REQUIRED)
+remote_type                  | text (enum: remote/hybrid/onsite/unknown)
+contract_type                | text (enum: full_time/part_time/contract/intern/temp/unknown)
+seniority_level              | text (enum: junior/intermediate/senior/unknown, filled by enricher)
+seniority_enrichment_status  | text (enum: not_tried/upgraded/failed_to_upgrade, default 'not_tried')
+salary_min                   | numeric
+salary_max                   | numeric
+salary_currency              | text
+description                  | text
+skills_raw                   | text[]
+posted_at                    | timestamptz
+apply_url                    | text
+source                       | text (REQUIRED)
+first_seen_at                | timestamptz (auto)
+last_seen_at                 | timestamptz (auto)
 ```
 
 ## Hash Key Generation

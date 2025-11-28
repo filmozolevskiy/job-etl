@@ -1,16 +1,17 @@
 """
 Seniority Level Extraction Utility
 
-This module provides a shared function to extract seniority level from job titles.
-Used by both the normalizer (to store seniority) and the ranker (for scoring).
+This module provides a shared function to extract seniority level from job
+titles. It is used by multiple services (e.g. ranker, enricher) to keep
+seniority logic consistent across the pipeline.
 
-The extraction uses simple keyword matching on the job title to determine
-if a position is junior, intermediate, or senior level.
+The extraction uses simple keyword and pattern matching on the job title to
+determine whether a position is junior, intermediate, or senior level.
 """
 
 import re
 
-# Valid seniority levels (must match database CHECK constraints)
+# Valid seniority levels (must match database CHECK constraints and marts schema)
 VALID_SENIORITY_LEVELS = {"junior", "intermediate", "senior", "unknown"}
 
 
@@ -29,29 +30,11 @@ def extract_seniority_level(job_title: str) -> str:
     (e.g., "architect" won't match "architecture").
 
     Args:
-        job_title: Job title string to analyze
+        job_title: Job title string to analyze.
 
     Returns:
-        Seniority level: 'junior', 'intermediate', 'senior', or 'unknown'
-        Returns 'unknown' if no seniority indicators are found
-
-    Examples:
-        >>> extract_seniority_level("Senior Data Engineer")
-        'senior'
-        >>> extract_seniority_level("Junior Software Developer")
-        'junior'
-        >>> extract_seniority_level("Mid-Level Analyst")
-        'intermediate'
-        >>> extract_seniority_level("Lead Software Engineer, Data Foundations")
-        'senior'
-        >>> extract_seniority_level("Chief Data Engineering Officer")
-        'senior'
-        >>> extract_seniority_level("VP, Lead Data & Analytics Eng")
-        'senior'
-        >>> extract_seniority_level("Sr. Data Engineer")
-        'senior'
-        >>> extract_seniority_level("Data Engineer")
-        'unknown'
+        Seniority level: 'junior', 'intermediate', 'senior', or 'unknown'.
+        Returns 'unknown' if no seniority indicators are found or input is invalid.
     """
     if not job_title or not isinstance(job_title, str):
         return "unknown"
@@ -74,6 +57,7 @@ def extract_seniority_level(job_title: str) -> str:
         or " iii" in job_title_lower
     ):
         return "senior"
+
     # Patterns: "Engineer II", "Level II", "II", " ii ", etc.
     # Note: "Engineer II" has no space before II, so check for that pattern
     if (
@@ -87,6 +71,7 @@ def extract_seniority_level(job_title: str) -> str:
         or "engineer ii" in job_title_lower
     ):
         return "intermediate"
+
     # Patterns: "Engineer I", "Level I", "I", " i ", etc.
     # Be careful with single "i" - only match if it's clearly a level indicator
     if (
@@ -109,7 +94,7 @@ def extract_seniority_level(job_title: str) -> str:
         level_num = int(level_match.group(1))
         if level_num >= 5:
             return "senior"
-        elif level_num == 4:
+        if level_num == 4:
             return "intermediate"
 
     # Check for executive/leadership roles first (these are always senior)
@@ -164,3 +149,5 @@ def extract_seniority_level(job_title: str) -> str:
 
     # No seniority indicators found
     return "unknown"
+
+
