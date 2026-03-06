@@ -44,16 +44,10 @@ A modular ETL pipeline that ingests job postings from different third‑party AP
 
 ## Default Credentials
 
-| Service       | Username        | Password                                      |
-|---------------|-----------------|-----------------------------------------------|
-| Airflow UI    | `admin`         | `admin` (set `AIRFLOW_ADMIN_PASSWORD` in `.env`) |
-| PostgreSQL    | `job_etl_user`  | From `secrets/database/postgres_password.txt` |
-| pgAdmin       | `admin@example.com` | `admin` (optional, `--profile tools`)      |
+| Service       | Username            | Password                                         |
+|---------------|---------------------|--------------------------------------------------|
+| Airflow UI    | `admin`             | `admin` (set `AIRFLOW_ADMIN_PASSWORD` in `.env`) |
+| PostgreSQL    | `job_etl_user`      | From `secrets/database/postgres_password.txt`    |
+| pgAdmin       | `admin@example.com` | `admin` (optional, `--profile tools`)        |
 
----
 
-## Documentation
-
-- [Specification](docs/specification.md)
-- [ETL Flow Diagram](docs/architecture/job-etl-flow.drawio)
-- [TODO](docs/TODO.md)
