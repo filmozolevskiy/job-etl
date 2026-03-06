@@ -13,12 +13,12 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Switch back to airflow user
-USER airflow
+# Copy requirements to airflow home (airflow user can read here; pip must run as airflow)
+COPY requirements.txt /opt/airflow/requirements.txt
+RUN chown airflow:root /opt/airflow/requirements.txt
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt /requirements.txt
-RUN pip install --no-cache-dir -r /requirements.txt
+USER airflow
+RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt
 
 # Set environment variables
 ENV AIRFLOW_HOME=/opt/airflow

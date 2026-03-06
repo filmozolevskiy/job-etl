@@ -87,6 +87,12 @@ models:
         tests:
           - not_null
       
+      - name: location_lat
+        description: "Latitude from geocoding (optional, enriched later)"
+      
+      - name: location_lon
+        description: "Longitude from geocoding (optional, enriched later)"
+      
       - name: remote_type
         description: "Remote work arrangement type"
         tests:

@@ -68,6 +68,8 @@ SELECT
     staging.job_title AS job_title_std,  -- Will be enriched later
     COALESCE(companies.company_id, staging.company_id_normalized) AS company_id,
     staging.location AS location_std,  -- Will be enriched later
+    NULL::NUMERIC AS location_lat,  -- Will be enriched by location normalization
+    NULL::NUMERIC AS location_lon,  -- Will be enriched by location normalization
     staging.remote_type,
     staging.contract_type,
     staging.seniority_level,

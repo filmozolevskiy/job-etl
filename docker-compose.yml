@@ -87,6 +87,7 @@ services:
     build:
       context: ./airflow
       dockerfile: Dockerfile
+    platform: linux/amd64  # tableauhyperapi has no linux/arm64 wheel
     container_name: job-etl-airflow-webserver
     restart: unless-stopped
     depends_on:
@@ -98,7 +99,8 @@ services:
         condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      # Connection string will be set in command script to read from secret file
+      # Must match secrets/airflow/airflow_postgres_password.txt
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -135,6 +137,7 @@ services:
       _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     secrets:
       - postgres_password
+      - airflow_postgres_password
       - smtp_password
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
@@ -153,7 +156,7 @@ services:
       - -c
       - |
         # Read Airflow postgres password from secret file
-        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password | tr -d '\n\r')
         export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
         # Wait for database initialization
         echo "Waiting for Airflow database initialization..."
@@ -180,6 +183,7 @@ services:
     build:
       context: ./airflow
       dockerfile: Dockerfile
+    platform: linux/amd64  # match airflow-webserver
     container_name: job-etl-airflow-scheduler
     restart: unless-stopped
     depends_on:
@@ -191,7 +195,8 @@ services:
         condition: service_completed_successfully
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      # Connection string will be set in command script to read from secret file
+      # Must match secrets/airflow/airflow_postgres_password.txt
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -238,7 +243,7 @@ services:
       - -c
       - |
         # Read Airflow postgres password from secret file
-        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password | tr -d '\n\r')
         export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
         # Wait for database initialization
         echo "Waiting for Airflow database initialization..."
@@ -265,6 +270,7 @@ services:
     build:
       context: ./airflow
       dockerfile: Dockerfile
+    platform: linux/amd64  # tableauhyperapi has no linux/arm64 wheel
     container_name: job-etl-airflow-init
     depends_on:
       airflow-postgres:
@@ -273,7 +279,8 @@ services:
         condition: service_healthy
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      # Connection string will be set in command script to read from secret file
+      # Must match secrets/airflow/airflow_postgres_password.txt
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW__CORE__FERNET_KEY}
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
@@ -305,7 +312,7 @@ services:
       - -c
       - |
         # Read Airflow postgres password from secret file
-        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password)
+        export AIRFLOW_POSTGRES_PASSWORD=$(cat /run/secrets/airflow_postgres_password | tr -d '\n\r')
         export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN="postgresql+psycopg2://airflow:${AIRFLOW_POSTGRES_PASSWORD}@airflow-postgres:5432/airflow"
         # Wait for database to be ready
         echo "Waiting for Airflow database to be ready..."

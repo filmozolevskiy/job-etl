@@ -304,6 +304,112 @@ def run_core_dbt_models(**context):
     return run_dbt_models(models="dim_companies fact_jobs", **context)
 
 
+def run_dbt_seed(**context):
+    """
+    Run dbt seed to load reference tables (company_size, contract_type, remote_type).
+
+    Seeds must be loaded before dbt test runs, since tests validate seed data.
+    """
+    import os
+    import subprocess
+    from airflow.hooks.base import BaseHook
+
+    print("=" * 60)
+    print("DBT SEED TASK - Loading seed reference tables")
+    print("=" * 60)
+
+    try:
+        # Get database credentials (same logic as run_dbt_models)
+        try:
+            conn = BaseHook.get_connection("postgres_default")
+            db_host = conn.host or "postgres"
+            db_port = conn.port or 5432
+            db_user = conn.login or "job_etl_user"
+            db_password = conn.password or ""
+            db_name = conn.schema or "job_etl"
+            if not db_password:
+                secret_path = "/run/secrets/postgres_password"
+                if os.path.exists(secret_path):
+                    try:
+                        with open(secret_path, encoding="utf-8") as f:
+                            db_password = f.read().strip()
+                    except UnicodeDecodeError:
+                        with open(secret_path, encoding="utf-16") as f:
+                            db_password = f.read().strip()
+        except Exception as e:
+            db_host = os.getenv("POSTGRES_HOST", "postgres")
+            db_port = os.getenv("POSTGRES_PORT", "5432")
+            db_user = os.getenv("POSTGRES_USER", "job_etl_user")
+            db_password = os.getenv("POSTGRES_PASSWORD") or ""
+            db_name = os.getenv("POSTGRES_DB", "job_etl")
+            if not db_password and os.path.exists("/run/secrets/postgres_password"):
+                with open("/run/secrets/postgres_password", encoding="utf-8") as f:
+                    db_password = f.read().strip()
+            if not db_password:
+                raise ValueError("Database password not configured") from e
+
+        project_dir = "/opt/airflow/dbt/job_dbt"
+        profiles_dir = "/tmp/dbt_profiles"
+        target_path = "/tmp/dbt_target"
+        log_path = "/tmp/dbt_logs"
+        os.makedirs(profiles_dir, exist_ok=True)
+        os.makedirs(target_path, exist_ok=True)
+        os.makedirs(log_path, exist_ok=True)
+
+        profiles_yml = f"""job_dbt:
+        target: docker
+        outputs:
+            docker:
+                type: postgres
+                host: {db_host}
+                port: {db_port}
+                user: {db_user}
+                password: '{db_password}'
+                dbname: {db_name}
+                schema: staging
+                threads: 4
+                keepalives_idle: 0
+                connect_timeout: 10
+                search_path: "staging,raw,marts,public"
+"""
+        with open(f"{profiles_dir}/profiles.yml", "w") as f:
+            f.write(profiles_yml)
+
+        cmd = [
+            "dbt",
+            "seed",
+            "--project-dir",
+            project_dir,
+            "--profiles-dir",
+            profiles_dir,
+            "--target-path",
+            target_path,
+            "--log-path",
+            log_path,
+        ]
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        print(result.stdout)
+        if result.stderr:
+            print("STDERR:", result.stderr)
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(result.returncode, cmd)
+        print("=" * 60)
+        print("DBT SEED TASK - Successfully loaded seeds")
+        print("=" * 60)
+        return {"status": "success"}
+    except subprocess.CalledProcessError as e:
+        print("=" * 60)
+        print(f"DBT SEED TASK - Failed with return code {e.returncode}")
+        print("=" * 60)
+        raise
+    except Exception as e:
+        print("=" * 60)
+        print(f"DBT SEED TASK - Unexpected error: {e}")
+        print("=" * 60)
+        raise
+
+
 def run_dbt_tests(**context):
     """
     Run dbt tests to validate data quality.
@@ -1481,6 +1587,21 @@ with DAG(
     )
 
     # -------------------------------------------------------------------------
+    # Task 5.5: Load dbt seeds (reference tables for tests)
+    # -------------------------------------------------------------------------
+    dbt_seed = PythonOperator(
+        task_id="dbt_seed",
+        python_callable=run_dbt_seed,
+        retries=2,
+        doc_md="""
+        **dbt: Load seeds**
+
+        - Loads reference tables (company_size, contract_type, remote_type)
+        - Required before dbt_tests (tests validate seed data)
+        """,
+    )
+
+    # -------------------------------------------------------------------------
     # Task 6: Run core dbt models (intermediate, dimensions, facts)
     # -------------------------------------------------------------------------
     dbt_models_core = PythonOperator(
@@ -1604,10 +1725,13 @@ with DAG(
     # Task Dependencies (Define the execution order)
     # -------------------------------------------------------------------------
 
-    # Linear flow: start → extract → normalize → enrich → models → dedupe → rank → tests → publish → notify → end
+    # Linear flow: start → extract → normalize → (enrich + seed in parallel) → models → dedupe → rank → tests → publish → notify → end
+    # dbt_seed runs after normalize (seeds are static refs, don't need enrich); enrich runs in parallel
     start >> extract_jsearch
     extract_jsearch >> normalize
+    normalize >> dbt_seed
     normalize >> enrich
+    dbt_seed >> dbt_models_core
     enrich >> dbt_models_core
     dbt_models_core >> dedupe_consolidate
     dedupe_consolidate >> rank
